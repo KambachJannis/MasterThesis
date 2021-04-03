@@ -1,24 +1,11 @@
+import os
+import tqdm
 import torch
-import torch.nn.functional as F
-import torchvision
-from torchvision import transforms
-import os, tqdm
 import numpy as np
-import time
-from sklearn.metrics import confusion_matrix
-import skimage
-from lcfcn import lcfcn_loss
-from src import models
-from haven import haven_img as hi
-from scipy import ndimage
-from PIL import Image
-from PIL import ImageFont
-from PIL import ImageDraw 
-import cv2
-from haven import haven_img
-from haven import haven_utils as hu
-from . import base_networks, metrics
-
+from models import base
+from helpers import metrics
+from helpers import haven_viz
+from models.losses import lcfcn_loss
 
 class LCFCN(torch.nn.Module):
     def __init__(self, exp_dict, train_set):
@@ -27,142 +14,156 @@ class LCFCN(torch.nn.Module):
         self.n_classes = train_set.n_classes
         self.exp_dict = exp_dict
 
-        self.model_base = base_networks.get_base(self.exp_dict['model']['base'],
-                                               self.exp_dict, n_classes=self.n_classes)
+        self.model_base = base.getBase(self.exp_dict['model']['base'], self.exp_dict, n_classes=self.n_classes)
 
         if self.exp_dict["optimizer"] == "adam":
-            self.opt = torch.optim.Adam(
-                self.model_base.parameters(), lr=self.exp_dict["lr"], betas=(0.99, 0.999), weight_decay=0.0005)
-
+            self.opt = torch.optim.Adam(self.model_base.parameters(), lr = self.exp_dict["lr"], betas = (0.99, 0.999), weight_decay = 0.0005)
         elif self.exp_dict["optimizer"] == "sgd":
-            self.opt = torch.optim.SGD(
-                self.model_base.parameters(), lr=self.exp_dict["lr"])
-
+            self.opt = torch.optim.SGD(self.model_base.parameters(), lr = self.exp_dict["lr"])
         else:
-            raise ValueError
+            name = self.exp_dict["optimizer"]
+            raise ValueError(f"Optimizer {name} not integrated.")
 
-    def train_on_loader(model, train_loader):
+    def getStateDict(self):
+        state_dict = {"model": self.model_base.state_dict(), "opt":self.opt.state_dict()}
+        return state_dict
+
+    def loadStateDict(self, state_dict):
+        self.model_base.load_state_dict(state_dict["model"])
+        self.opt.load_state_dict(state_dict["opt"])
+    
+    def trainOnLoader(self, model, train_loader):
+        # ???
         model.train()
 
+        # Prepare Variables
         n_batches = len(train_loader)
         train_meter = metrics.Meter()
-        
         pbar = tqdm.tqdm(total=n_batches)
-        for batch in train_loader:
-            score_dict = model.train_on_batch(batch)
-            train_meter.add(score_dict['train_loss'], batch['images'].shape[0])
 
+        # MAIN LOOP
+        for batch in train_loader:
+            # Train on Batch
+            score_dict = model.trainOnBatch(batch)
+            # Save Loss
+            train_meter.add(score_dict['train_loss'], batch['images'].shape[0])
+            # Update PBar
             pbar.set_description("Training. Loss: %.4f" % train_meter.get_avg_score())
             pbar.update(1)
 
+        overall_loss = train_meter.get_avg_score()
         pbar.close()
 
-        return {'train_loss':train_meter.get_avg_score()}
+        return {'train_loss': overall_loss}
+    
+    def trainOnBatch(self, batch, **extras):
+        # Zero the gradients 
+        self.opt.zero_grad()
+        # ???
+        self.train()
+
+        # Load Data to GPU
+        images = batch["images"].cuda()
+        points = batch["points"].long().cuda()
+        
+        # Forward Prop
+        logits = self.model_base.forward(images)
+        # Calculate Loss
+        loss = lcfcn_loss.compute_loss(points = points, probs = logits.sigmoid())
+        # Backprop
+        loss.backward()
+        # Optimize
+        self.opt.step()
+
+        return {"train_loss": loss.item()}
 
     @torch.no_grad()
-    def val_on_loader(self, val_loader, savedir_images=None, n_images=2):
+    def valOnLoader(self, val_loader, savedir_images = None, n_images = 2):
+        # ???
         self.eval()
-
+        
+        # Prepare Variables
         n_batches = len(val_loader)
         val_meter = metrics.Meter()
         pbar = tqdm.tqdm(total=n_batches)
+        
+        # MAIN LOOP
         for i, batch in enumerate(tqdm.tqdm(val_loader)):
-            score_dict = self.val_on_batch(batch)
+            # Validate on Batch
+            score_dict = self.valOnBatch(batch)
+            # Save Score
             val_meter.add(score_dict['miscounts'], batch['images'].shape[0])
-            
+            # Update PBar
+            pbar.set_description("Validating. MAE: %.4f" % val_meter.get_avg_score())
             pbar.update(1)
-
+            # Export Demo Images
             if savedir_images and i < n_images:
-                os.makedirs(savedir_images, exist_ok=True)
-                self.vis_on_batch(batch, savedir_image=os.path.join(
-                    savedir_images, "%d.jpg" % i))
+                os.makedirs(savedir_images, exist_ok = True)
+                self.visOnBatch(batch, savedir_image=os.path.join(savedir_images, "%d.jpg" % i))
                 
-                pbar.set_description("Validating. MAE: %.4f" % val_meter.get_avg_score())
-
         pbar.close()
         val_mae = val_meter.get_avg_score()
         val_dict = {'val_mae':val_mae, 'val_score':-val_mae}
+        
         return val_dict
 
-    def train_on_batch(self, batch, **extras):
-        self.opt.zero_grad()
-        self.train()
-
-        images = batch["images"].cuda()
-        points = batch["points"].long().cuda()
-        logits = self.model_base.forward(images)
-        loss = lcfcn_loss.compute_loss(points=points, probs=logits.sigmoid())
-        
-        loss.backward()
-
-        self.opt.step()
-
-        return {"train_loss":loss.item()}
-
-
-    def get_state_dict(self):
-        state_dict = {"model": self.model_base.state_dict(),
-                      "opt":self.opt.state_dict()}
-
-        return state_dict
-
-    def load_state_dict(self, state_dict):
-        self.model_base.load_state_dict(state_dict["model"])
-        self.opt.load_state_dict(state_dict["opt"])
-
-    def val_on_batch(self, batch):
+    def valOnBatch(self, batch):
+        #???
         self.eval()
+
+        # Load Data to GPU
         images = batch["images"].cuda()
         points = batch["points"].long().cuda()
+        
+        # Forward Prop
         logits = self.model_base.forward(images)
+        # ??
         probs = logits.sigmoid().cpu().numpy()
-
         blobs = lcfcn_loss.get_blobs(probs=probs)
+        miscounts = abs(float((np.unique(blobs) !=0 ).sum() - (points != 0).sum()))
 
-        return {'miscounts': abs(float((np.unique(blobs)!=0).sum() - 
-                                (points!=0).sum()))}
+        return {'miscounts': miscounts}
         
     @torch.no_grad()
     def vis_on_batch(self, batch, savedir_image):
         self.eval()
         images = batch["images"].cuda()
-        points = batch["points"].long().cuda()
+        #points = batch["points"].long().cuda() unused var
         logits = self.model_base.forward(images)
         probs = logits.sigmoid().cpu().numpy()
 
         blobs = lcfcn_loss.get_blobs(probs=probs)
 
-        pred_counts = (np.unique(blobs)!=0).sum()
+        #pred_counts = (np.unique(blobs)!=0).sum() unused var
         pred_blobs = blobs
         pred_probs = probs.squeeze()
 
         # loc 
-        pred_count = pred_counts.ravel()[0]
+        #pred_count = pred_counts.ravel()[0] #unused var
         pred_blobs = pred_blobs.squeeze()
         
-        img_org = hu.get_image(batch["images"],denorm="rgb")
+        img_org = haven_viz.get_image(batch["images"],denorm="rgb")
 
         # true points
         y_list, x_list = np.where(batch["points"][0].long().numpy().squeeze())
-        img_peaks = haven_img.points_on_image(y_list, x_list, img_org)
+        img_peaks = haven_viz.points_on_image(y_list, x_list, img_org)
         text = "%s ground truth" % (batch["points"].sum().item())
-        haven_img.text_on_image(text=text, image=img_peaks)
+        haven_viz.text_on_image(text=text, image=img_peaks)
 
         # pred points 
         pred_points = lcfcn_loss.blobs2points(pred_blobs).squeeze()
         y_list, x_list = np.where(pred_points.squeeze())
-        img_pred = hi.mask_on_image(img_org, pred_blobs)
+        img_pred = haven_viz.mask_on_image(img_org, pred_blobs)
         # img_pred = haven_img.points_on_image(y_list, x_list, img_org)
         text = "%s predicted" % (len(y_list))
-        haven_img.text_on_image(text=text, image=img_pred)
+        haven_viz.text_on_image(text=text, image=img_pred)
 
         # heatmap 
-        heatmap = hi.gray2cmap(pred_probs)
-        heatmap = hu.f2l(heatmap)
-        haven_img.text_on_image(text="lcfcn heatmap", image=heatmap)
-        
-        
+        heatmap = haven_viz.gray2cmap(pred_probs)
+        heatmap = haven_viz.f2l(heatmap)
+        haven_viz.text_on_image(text="lcfcn heatmap", image=heatmap)
+    
         img_mask = np.hstack([img_peaks, img_pred, heatmap])
         
-        hu.save_image(savedir_image, img_mask)
+        haven_viz.save_image(savedir_image, img_mask)
      
