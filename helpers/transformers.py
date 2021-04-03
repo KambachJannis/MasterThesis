@@ -4,14 +4,10 @@ import torch
 import numpy as np
 
 
-def apply_transform(split, image, points, 
-                    transform_name='basic',
-                    exp_dict=None):
-
+def applyTransform(split, image, points, transform_name='basic', exp_dict=None):
     if transform_name == 'rgb_normalize':
         mean = [0.485, 0.456, 0.406]
         std = [0.229, 0.224, 0.225]
-
         transform = ComposeJoint(
             [
                 [transforms.ToTensor(), None],
@@ -36,7 +32,6 @@ class ComposeJoint(object):
             for i, transform in enumerate(transforms):
                 x[i] = self._iterate_transforms(transform, x[i])
         else:
-
             if transforms is not None:
                 x = transforms(x)
 
