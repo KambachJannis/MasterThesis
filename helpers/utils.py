@@ -1,150 +1,254 @@
-import collections
-import torch
-import random
-import numpy as np
+import os
 import json
-from torch.utils import data
-import scipy.misc
-import scipy.io as io
-from skimage import draw
-import losses
-from PIL import ImageOps
-from bs4 import BeautifulSoup
-import pickle 
-from skimage.segmentation import mark_boundaries
+import copy
+import torch
+import shutil
+import pickle
+import hashlib
+import itertools
+
+def deleteExperiment(savedir, backup_flag = False):
+    """Delete an experiment. If the backup_flag is true it moves the experiment
+    to the delete folder.
+    
+    Parameters
+    ----------
+    savedir : str
+        Directory of the experiment
+    backup_flag : bool, optional
+        If true, instead of deleted is moved to delete folder, by default False
+    """
+    # get experiment id
+    exp_id = os.path.split(savedir)[-1]
+    assert(len(exp_id) == 32)
+
+    # get paths
+    savedir_base = os.path.dirname(savedir)
+    savedir = os.path.join(savedir_base, exp_id)
+
+    if backup_flag:
+        # create 'deleted' folder 
+        dst = os.path.join(savedir_base, 'deleted', exp_id)
+        os.makedirs(dst, exist_ok=True)
+
+        if os.path.exists(dst):
+            shutil.rmtree(dst)
+    
+    if os.path.exists(savedir):
+        if backup_flag:
+            # moves folder to 'deleted'
+            shutil.move(savedir, dst)
+        else:
+            # delete experiment folder 
+            shutil.rmtree(savedir)
+
+    # make sure the experiment doesn't exist anymore
+    assert(not os.path.exists(savedir))
+
+def saveJSON(fname, data, makedirs = True):
+    """Save data into a json file.
+    Parameters
+    ----------
+    fname : str
+        Name of the json file
+    data : [type]
+        Data to save into the json file
+    makedirs : bool, optional
+        If enabled creates the folder for saving the file, by default True
+    """
+    dirname = os.path.dirname(fname)
+    if makedirs and dirname != '':
+        os.makedirs(dirname, exist_ok=True)
+    with open(fname, "w") as json_file:
+        json.dump(data, json_file, indent=4, sort_keys=True)
+
+def loadJSON(fname, decode = None):  # TODO: decode???
+    """Load a json file.
+    Parameters
+    ----------
+    fname : str
+        Name of the file
+    decode : [type], optional
+        [description], by default None
+    Returns
+    -------
+    [type]
+        Content of the file
+    """
+    with open(fname, "r") as json_file:
+        d = json.load(json_file)
+
+    return d
 
 
-# Misc Utils
-def shrink2roi(img, roi):
-    ind = np.where(roi != 0)
-
-    y_min = min(ind[0])
-    y_max = max(ind[0])
-
-    x_min = min(ind[1])
-    x_max = max(ind[1])
-
-    return img[y_min:y_max, x_min:x_max]
-
-def t2n(x):
-    if isinstance(x, torch.Tensor):
-        x = x.cpu().detach().numpy()
-
-    return x
-
-def read_text(fname):
-    # READS LINES
-    with open(fname, "r") as f:
+def readText(fname):
+    """Loads the content of a text file.
+    Parameters
+    ----------
+    fname : str
+        File name
+    Returns
+    -------
+    list
+        Content of the file. List containing the lines of the file
+    """
+    with open(fname, "r", encoding="utf-8", errors='replace') as f:
         lines = f.readlines()
     return lines
 
-def save_json(fname, data):
-    with open(fname, "w") as json_file:
-        json.dump(data, json_file, indent=4, sort_keys=True)
-    
-def load_json(fname):
-    with open(fname, "r") as json_file:
-        d = json.load(json_file)
-    
-    return d
 
-def imread(fname):
-    return scipy.misc.imread(fname)
-
-
-def loadmat(fname):
-    return io.loadmat(fname)
-
-
-@torch.no_grad()
-def compute_loss(model, dataset):
-    n_images = len(dataset)
-    
-    loss_sum = 0.
-    for i in range(n_images):
-        print("{}/{}".format(i, n_images))
-
-        batch = dataset[i]
-        batch["images"] = batch["images"][None]
-        batch["points"] = batch["points"][None]
-        batch["counts"] = batch["counts"][None]
-        
-        loss_sum += losses.lc_loss(model, batch).item()
-
-    return loss_sum
-
-
-class RandomSampler(data.sampler.Sampler):
-    def __init__(self, train_set):
-        self.n_samples = len(train_set)
-        self.size = min(self.n_samples, 5000)
-
-    def __iter__(self):
-        # np.random.seed(777)
-        indices = np.random.randint(0, self.n_samples, self.size)
-        # print('indices: ',indices)
-        return iter(torch.from_numpy(indices).long())
-
-    def __len__(self):
-        return self.size
-
-def poly2mask(rows, cols, shape):
-    assert len(rows) == len(cols)
-    fill_row_coords, fill_col_coords = draw.polygon(rows, cols, shape)
-    mask = np.zeros(shape, dtype=np.bool)
-    mask[fill_row_coords, fill_col_coords] = True
-
-    return mask
-
-def read_xml(fname):
-    with open(fname) as f:
-        xml = f.readlines()
-        xml = ''.join([line.strip('\t') for line in xml])
-        
-        xml = BeautifulSoup(xml, "html.parser")
-
-    return xml
-
-def load_pkl(fname):
-    with open(fname, "rb") as f:        
+def loadPKL(fname):
+    """Load the content of a pkl file.
+    Parameters
+    ----------
+    fname : str
+        File name
+    Returns
+    -------
+    [type]
+        Content of the file
+    """
+    with open(fname, "rb") as f:
         return pickle.load(f)
 
 
-def combine_image_blobs(image_raw, blobs_mask):
-    blobs_rgb = label2rgb(blobs_mask)           #different labels with different color
+def savePKL(fname, data, with_rename = True, makedirs = True):
+    """Save data in pkl format.
+    Parameters
+    ----------
+    fname : str
+        File name
+    data : [type]
+        Data to save in the file
+    with_rename : bool, optional
+        [description], by default True
+    makedirs : bool, optional
+        If enabled creates the folder for saving the file, by default True
+    """
+    # Create folder
+    dirname = os.path.dirname(fname)
+    if makedirs and dirname != '':
+        os.makedirs(dirname, exist_ok=True)
 
-    image_raw = image_raw * 0.5 + blobs_rgb * 0.5
-    image_raw /= image_raw.max()
+    # Save file
+    if with_rename:
+        fname_tmp = fname + "_tmp.pth"
+        with open(fname_tmp, "wb") as f:
+            pickle.dump(data, f)
+        if os.path.exists(fname):
+            os.remove(fname)
+        os.rename(fname_tmp, fname)
+    else:
+        with open(fname, "wb") as f:
+            pickle.dump(data, f)
 
-    return mark_boundaries(image_raw, blobs_mask)
+def cartesian(exp_config, remove_none = False):
+    """Cartesian experiment config.
+    It converts the exp_config into a list of experiment configuration by doing
+    the cartesian product of the different configuration. It is equivalent to
+    do a grid search.
+    Parameters
+    ----------
+    exp_config : str
+        Dictionary with the experiment Configuration
+    Returns
+    -------
+    exp_list: str
+        A list of experiments, each defines a single set of hyper-parameters
+    """
+    exp_config_copy = copy.deepcopy(exp_config)
+
+    # Make sure each value is a list
+    for k, v in exp_config_copy.items():
+        if not isinstance(exp_config_copy[k], list):
+            exp_config_copy[k] = [v]
+
+    # Create the cartesian product
+    exp_list_raw = (dict(zip(exp_config_copy.keys(), values))
+                    for values in itertools.product(*exp_config_copy.values()))
+
+    # Convert into a list
+    exp_list = []
+    for exp_dict in exp_list_raw:
+        # remove hparams with None
+        if remove_none:
+            to_remove = []
+            for k, v in exp_dict.items():
+                if v is None:
+                    to_remove += [k]
+            for k in to_remove:
+                del exp_dict[k]
+        exp_list += [exp_dict]
+
+    return exp_list
+
+def hashDict(exp_dict):
+    """Create a hash for an experiment.
+    Parameters
+    ----------
+    exp_dict : dict
+        An experiment, which is a single set of hyper-parameters
+    Returns
+    -------
+    hash_id: str
+        A unique id defining the experiment
+    """
+    dict2hash = ""
+    if not isinstance(exp_dict, dict):
+        raise ValueError('exp_dict is not a dict')
+
+    for k in sorted(exp_dict.keys()):
+        if '.' in k:
+            raise ValueError(". has special purpose")
+        elif isinstance(exp_dict[k], dict):
+            v = hashDict(exp_dict[k])
+        elif isinstance(exp_dict[k], tuple):
+            raise ValueError("tuples can't be hashed yet, consider converting tuples to lists")
+        else:
+            v = exp_dict[k]
+
+        dict2hash += os.path.join(str(k), str(v))
+
+    hash_id = hashlib.md5(dict2hash.encode()).hexdigest()
+
+    return hash_id
+
+def loadTorch(fname, map_location = None):
+    """Load the content of a torch file.
+    Parameters
+    ----------
+    fname : str
+        File name
+    map_location : [type], optional
+        Maping the loaded model to a specific device (i.e., CPU or GPU), this
+        is needed if trained in CPU and loaded in GPU and viceversa, by default
+        None
+    Returns
+    -------
+    [type]
+        Loaded torch model
+    """
+    obj = torch.load(fname, map_location=map_location)
+
+    return obj
 
 
-def label2rgb(labels):
-    labels = np.squeeze(labels)
-    colors = color_map(np.max(np.unique(labels)) + 1)
-    output = np.zeros(labels.shape + (3,), dtype=np.float64)
+def saveTorch(fname, obj):
+    """Save data in torch format.
+    Parameters
+    ----------
+    fname : str
+        File name
+    obj : [type]
+        Data to save
+    """
+    # Create folder
+    os.makedirs(os.path.dirname(fname), exist_ok=True)  # TODO: add makedirs parameter?
 
-    for i in range(len(colors)):
-      output[(labels == i).nonzero()] = colors[i]
+    # Define names of temporal files
+    fname_tmp = fname + ".tmp"  # TODO: Make the safe flag?
 
-    return output
-
-def color_map(N=256, normalized=False):
-    def bitget(byteval, idx):
-        return ((byteval & (1 << idx)) != 0)
-
-    dtype = 'float32' if normalized else 'uint8'
-    cmap = np.zeros((N, 3), dtype=dtype)
-    for i in range(N):
-        r = g = b = 0
-        c = i
-        for j in range(8):
-            r = r | (bitget(c, 0) << 7-j)
-            g = g | (bitget(c, 1) << 7-j)
-            b = b | (bitget(c, 2) << 7-j)
-            c = c >> 3
-
-        cmap[i] = np.array([r, g, b])
-
-    cmap = cmap/255 if normalized else cmap
-    return cmap
+    torch.save(obj, fname_tmp)
+    if os.path.exists(fname):
+        os.remove(fname)
+    os.rename(fname_tmp, fname)
