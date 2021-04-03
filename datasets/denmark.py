@@ -7,7 +7,6 @@ import numpy as np
 # Image Handling
 import fiona
 import rasterio
-from scipy.io import loadmat
 from skimage.io import imread
 # Custom
 from helpers import utils
