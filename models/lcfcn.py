@@ -125,7 +125,7 @@ class LCFCN(torch.nn.Module):
         return {'miscounts': miscounts}
         
     @torch.no_grad()
-    def vis_on_batch(self, batch, savedir_image):
+    def visOnBatch(self, batch, savedir_image):
         self.eval()
         images = batch["images"].cuda()
         #points = batch["points"].long().cuda() unused var
