@@ -7,8 +7,6 @@ from skimage.segmentation import find_boundaries
 from scipy import ndimage
 from skimage import morphology as morph
 
-
-
 def compute_loss(points, probs, roi_mask=None):
     """
     images: n x c x h x w
@@ -116,8 +114,6 @@ def get_tgt_list(points, probs, roi_mask=None):
 
     return tgt_list 
 
-
-
 def watersplit(_probs, _points):
     points = _points.copy()
 
@@ -128,7 +124,6 @@ def watersplit(_probs, _points):
     seg = watershed(probs, points)
 
     return find_boundaries(seg)
-
 
 def get_blobs(probs, roi_mask=None):
     probs = probs.squeeze()
@@ -143,8 +138,7 @@ def get_blobs(probs, roi_mask=None):
         blobs = (blobs * roi_mask[None]).astype(int)
 
     return blobs
-
-
+        
 def blobs2points(blobs):
     blobs = blobs.squeeze()
     points = np.zeros(blobs.shape).astype("uint8")
@@ -158,81 +152,3 @@ def blobs2points(blobs):
         points[int(y), int(x)] = 1
 
     return points
-
-def compute_game(pred_points, gt_points, L=1):
-    n_rows = 2**L
-    n_cols = 2**L
-
-    pred_points = pred_points.astype(float).squeeze()
-    gt_points = np.array(gt_points).astype(float).squeeze()
-    h, w = pred_points.shape
-    se = 0.
-
-    hs, ws = h//n_rows, w//n_cols
-    for i in range(n_rows):
-        for j in range(n_cols):
-
-            sr, er = hs*i, hs*(i+1)
-            sc, ec = ws*j, ws*(j+1)
-
-            pred_count = pred_points[sr:er, sc:ec]
-            gt_count = gt_points[sr:er, sc:ec]
-            
-            se += float(abs(gt_count.sum() - pred_count.sum()))
-    return se
-
-def save_tmp(fname, images, logits, radius, points):
-    from haven import haven_utils as hu
-    probs = F.softmax(logits, 1); 
-    mask = probs.argmax(dim=1).cpu().numpy().astype('uint8').squeeze()
-    img_mask=hu.save_image('tmp2.png', 
-                hu.denormalize(images, mode='rgb'), 
-                mask=mask, return_image=True)
-    hu.save_image(fname,np.array(img_mask)/255. , radius=radius,
-                    points=points)
-
-def get_random_points(mask, n_points=1, seed=1):
-    from haven import haven_utils as hu
-    y_list, x_list = np.where(mask)
-    points = np.zeros(mask.squeeze().shape)
-    with hu.random_seed(seed):
-        for i in range(n_points):
-            yi = np.random.choice(y_list)
-            x_tmp = x_list[y_list == yi]
-            xi = np.random.choice(x_tmp)
-            points[yi, xi] = 1
-
-    return points
-
-def get_points_from_mask(mask, bg_points=0):
-    n_points = 0
-    points = np.zeros(mask.shape)
-    # print(np.unique(mask))
-    assert(len(np.setdiff1d(np.unique(mask),[0,1,2] ))==0)
-
-    for c in np.unique(mask):
-        if c == 0:
-            continue
-        blobs =  morph.label((mask==c).squeeze())
-        points_class = blobs2points(blobs)
-
-        ind = points_class!=0
-        n_points += int(points_class[ind].sum())
-        points[ind] = c
-    assert morph.label((mask).squeeze()).max() == n_points
-    points[points==0] = 255
-    if bg_points == -1:
-       bg_points = n_points
-
-    if bg_points:
-        from haven import haven_utils as hu
-        y_list, x_list = np.where(mask==0)
-        with hu.random_seed(1):
-            for i in range(bg_points):
-                yi = np.random.choice(y_list)
-                x_tmp = x_list[y_list == yi]
-                xi = np.random.choice(x_tmp)
-                points[yi, xi] = 0
-
-    return points
-        
