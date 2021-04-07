@@ -1,154 +1,177 @@
 import torch
-import skimage
-import torch.nn.functional as F
 import numpy as np
-from skimage.segmentation import watershed
-from skimage.segmentation import find_boundaries
 from scipy import ndimage
-from skimage import morphology as morph
+import torch.nn.functional as F
+from skimage.morphology import label as ski_label
+from skimage.measure import regionprops as ski_regions
+from skimage.segmentation import watershed as ski_watershed
+from skimage.segmentation import find_boundaries as ski_boundaries
 
-def compute_loss(points, probs, roi_mask=None):
+def computeLoss(points, probs, roi_mask=None):
     """
-    images: n x c x h x w
+    points: n x c x h x w
     probs: h x w (0 or 1)
-    """
-    points = points.squeeze()
-    probs = probs.squeeze()
-
-    assert(points.max() <= 1)
-
-    tgt_list = get_tgt_list(points, probs, roi_mask=roi_mask)
-
-    # image level
-    # pt_flat = points.view(-1)
-    pr_flat = probs.view(-1)
     
-    # compute loss
+    """
     loss = 0.
-    for tgt_dict in tgt_list:
-        pr_subset = pr_flat[tgt_dict['ind_list']]
-        # pr_subset = pr_subset.cpu()
-        loss += tgt_dict['scale'] * F.binary_cross_entropy(pr_subset, 
-                                        torch.ones(pr_subset.shape, device=pr_subset.device) * tgt_dict['label'], 
-                                        reduction='mean')
+    # eliminate single dimensions (A x B x 1 -> A x B)
+    points = points.squeeze()
+    assert(points.max() <= 1)
+    probs = probs.squeeze()
+    # unfold A x B tensor to A*B x 1 tensor
+    probs_flat = probs.view(-1)
+    
+    # get list of all relevant pixels and their GT labels
+    checklist = getPixelChecklist(points, probs, roi_mask = roi_mask)
+    for item in checklist:
+        # get relevant pixels for this item
+        item_ids = probs_flat[item['id_list']]
+        # init tensor of same size and fill with label value
+        item_label = torch.ones(item_ids.shape, device = item_ids.device) * item['label']
+        # essentially log function
+        loss += item['scale'] * F.binary_cross_entropy(item_ids, item_label, reduction='mean')
     
     return loss
 
 @torch.no_grad()
-def get_tgt_list(points, probs, roi_mask=None):
-    tgt_list = []
-
-    # image level
+def getPixelChecklist(points, probs, roi_mask=None):
+    """
+    For each loss function part, builds a list of relevant pixels and their GT labels.
+    
+    """
+    checklist = []
+    
+    ################ IMAGE LEVEL ######################
     pt_flat = points.view(-1)
     pr_flat = probs.view(-1)
+    class_list = points.unique()
+    
+    if 0 in class_list:
+        # pixel with highest chance for background class
+        id_background = pr_flat.argmin() 
+        checklist += [{'scale': 1, 'id_list': [id_background], 'label': 0}]
+        
+    if 1 in class_list:
+        # pixel with highest chance for foreground class
+        id_foreground = pr_flat.argmax()
+        checklist += [{'scale': 1, 'id_list': [id_foreground], 'label': 1}]   
 
-    u_list = points.unique()
-    if 0 in u_list:
-        ind_bg = pr_flat.argmin()
-        tgt_list += [{'scale': 1, 'ind_list':[ind_bg], 'label':0}]   
+    ################ POINT LEVEL ######################
+    if 1 in class_list:
+        # locate point labels
+        ids_labels = torch.where(pt_flat==1)[0]
+        checklist += [{'scale': len(ids_labels), 'id_list': ids_labels, 'label': 1}]  
 
-    if 1 in u_list:
-        ind_fg = pr_flat.argmax()
-        tgt_list += [{'scale': 1, 'ind_list':[ind_fg], 'label':1}]   
-
-    # point level
-    if 1 in u_list:
-        ind_fg = torch.where(pt_flat==1)[0]
-        tgt_list += [{'scale': len(ind_fg), 'ind_list':ind_fg, 'label':1}]  
-
-    # get blobs
+    ################ SPLIT LEVEL ######################
     probs_numpy = probs.detach().cpu().numpy()
-    blobs = get_blobs(probs_numpy, roi_mask=None)
-
-    # get foreground and background blobs
-    points = points.cpu().numpy()
-    fg_uniques = np.unique(blobs * points)
-    bg_uniques = [x for x in np.unique(blobs) if x not in fg_uniques]
-
-    # split level
-    # -----------
-    n_total = points.sum()
-
-    if n_total > 1:
-        # global split
-        boundaries = watersplit(probs_numpy, points)
-        ind_bg = np.where(boundaries.ravel())[0]
-
-        tgt_list += [{'scale': (n_total-1), 'ind_list':ind_bg, 'label':0}]  
-
-        # local split
-        for u in fg_uniques:
-            if u == 0:
+    points_numpy = points.cpu().numpy()
+    # get blobs
+    blobs = getBlobs(probs_numpy, roi_mask=None)
+    # get foreground and background blob ids
+    foreground_blobs = np.unique(blobs * points_numpy) # mult with points = eliminate background
+    background_blobs = [x for x in np.unique(blobs) if x not in foreground_uniques]
+    
+    if points_numpy.sum() > 1:
+        # GLOBAL SPLIT
+        boundaries = ski_watersplit(probs_numpy, points_numpy)
+        # get ids of boundary lines on flat array
+        ids_boundaries = np.where(boundaries.ravel())[0]
+        checklist += [{'scale': (points_numpy.sum()-1), 'id_list': ids_boundaries, 'label': 0}]  #boundaries = background = 0
+        # LOCAL SPLIT
+        for blob in foreground_blobs:
+            # not background
+            if blob == 0:
                 continue
-
-            ind = blobs==u
-
-            b_points = points * ind
-            n_points = b_points.sum()
-            
-            if n_points < 2:
+            # bool matrix with False where other blobs are, True for blob and background
+            blob_mask = blobs==blob
+            # all points within the mask (all points for this blob, since none on background)
+            blob_points = points_numpy * blob_mask
+            # skip blob if it does not need to be split
+            if blob_points.sum() < 2: 
                 continue
-            
-            # local split
-            boundaries = watersplit(probs_numpy, b_points)*ind
-            ind_bg = np.where(boundaries.ravel())[0]
+            # if not, initiate local split for only the selected blob points
+            boundaries = watersplit(probs_numpy, blob_points) * blob_mask
+            # get ids of boundary lines on flat array
+            ids_boundaries = np.where(boundaries.ravel())[0]
+            checklist += [{'scale': (blob_points.sum() - 1), 'id_list': ids_boundaries, 'label': 0}]  #boundaries = background = 0
 
-            tgt_list += [{'scale': (n_points - 1), 'ind_list':ind_bg, 'label':0}]  
-
-    # fp level
-    for u in bg_uniques:
+    ################ FALSE POSITIVE LEVEL ######################
+    for blob in background_blobs:
+        # not background itself
         if u == 0:
             continue
-        
-        b_mask = blobs==u
+        # bool matrix with False where other blobs are, True for blob and background
+        blob_mask = blobs==blob
+        # subtract RoI mask if given
         if roi_mask is not None:
-            b_mask = (roi_mask * b_mask)
-        if b_mask.sum() == 0:
-            pass
-            # from haven import haven_utils as hu
-            # hu.save_image('tmp.png', np.hstack([blobs==u, roi_mask]))
-            # print()
+            blob_mask = (roi_mask * blob_mask)
+        # ensure that blob has not been removed by RoI mask
+        if blob_mask.sum() == 0:
+            pass # do nothing
         else:
-            ind_bg = np.where(b_mask.ravel())[0]
-            tgt_list += [{'scale': 1, 'ind_list':ind_bg, 'label':0}]  
+            # get ids of all the background pixels in RoI
+            ids_background = np.where(blob_mask.ravel())[0]
+            checklist += [{'scale': 1, 'id_list': ids_background, 'label': 0}]  
 
-    return tgt_list 
+    return checklist 
 
 def watersplit(_probs, _points):
+    '''
+    Applies watershed and find_boundaries algorithms to detect object boundaries.
+    Returns matrix with boundaries labeled 1.
+    
+    '''
     points = _points.copy()
-
+    probs = _probs.copy()
+    # assign 1 - n number to the n point labels
     points[points != 0] = np.arange(1, points.sum()+1)
     points = points.astype(float)
+    # black top hat filter = remove all white objects that are too big
+    # here: remove all blobs > 7
+    probs = ndimage.black_tophat(probs, 7)
+    # apply watershed algo to get image with segmented regions
+    seg = ski_watershed(probs, points)
+    # convert segmented regions into 0/1 boundaries
+    splits = ski_boundaries(seg)
 
-    probs = ndimage.black_tophat(_probs.copy(), 7)
-    seg = watershed(probs, points)
+    return splits
 
-    return find_boundaries(seg)
-
-def get_blobs(probs, roi_mask=None):
+def getBlobs(probs, roi_mask=None):
+    ''' 
+    Assignes unique numbers to connected high-probability regions.
+    Essentially a transformation of the probability matrix.
+    
+    '''
     probs = probs.squeeze()
     h, w = probs.shape
- 
-    pred_mask = (probs>0.5).astype('uint8')
+    # zeros matrix with probs shape
     blobs = np.zeros((h, w), int)
-
-    blobs = morph.label(pred_mask == 1)
-
+    # discard unlikely regions
+    pred_mask = (probs>0.5).astype('uint8')
+    # connected pixel groups get assigned a unique number
+    blobs = ski_label(pred_mask == 1)
+    # subtract RoI mask if given
     if roi_mask is not None:
         blobs = (blobs * roi_mask[None]).astype(int)
 
     return blobs
         
-def blobs2points(blobs):
+def blobsToPoints(blobs):
+    ''' 
+    Exports map of blob centroids.
+    
+    '''
     blobs = blobs.squeeze()
+    # init zeros array
     points = np.zeros(blobs.shape).astype("uint8")
-    rps = skimage.measure.regionprops(blobs)
-
     assert points.ndim == 2
-
-    for r in rps:
+    # returns a list of labeled regions with their properties
+    region_properties = ski_regions(blobs)
+    # iterate through regions (blobs)
+    for blob in region_properties:
+        # find central point
         y, x = r.centroid
-
+        # add point to empty array
         points[int(y), int(x)] = 1
 
     return points

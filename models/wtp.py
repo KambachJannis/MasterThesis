@@ -5,9 +5,9 @@ import numpy as np
 from models import base
 from helpers import metrics
 from helpers import haven_viz
-from models.losses import lcfcn_loss
+from models.losses import wtp_loss
 
-class LCFCN(torch.nn.Module):
+class WTP(torch.nn.Module):
     def __init__(self, exp_dict, train_set):
         super().__init__()
         self.exp_dict = exp_dict
@@ -19,7 +19,7 @@ class LCFCN(torch.nn.Module):
         if self.exp_dict["optimizer"] == "adam":
             self.opt = torch.optim.Adam(self.model_base.parameters(), lr = self.exp_dict["lr"], betas = (0.99, 0.999), weight_decay = 0.0005)
         elif self.exp_dict["optimizer"] == "sgd":
-            self.opt = torch.optim.SGD(self.model_base.parameters(), lr = self.exp_dict["lr"])
+            self.opt = torch.optim.SGD(self.model_base.parameters(), lr = self.exp_dict["lr"], momentum = 0.9, weight_decay = 0.0005)
         else:
             name = self.exp_dict["optimizer"]
             raise ValueError(f"Optimizer {name} not integrated.")
@@ -69,7 +69,7 @@ class LCFCN(torch.nn.Module):
         # Forward Prop
         logits = self.model_base.forward(images)
         # Calculate Loss
-        loss = lcfcn_loss.computeLoss(points = points, probs = logits.sigmoid())
+        loss = wtp_loss.computeLoss(points = points, probs = logits.sigmoid())
         # Backprop
         loss.backward()
         # Optimize
