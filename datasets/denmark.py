@@ -29,8 +29,9 @@ class Denmark(data.Dataset):
         elif split == "test":
             fname = os.path.join(datadir, 'image_sets', 'test.txt')
 
-        self.path = os.path.join(datadir, 'images')
-        self.img_names = [name.replace(".jpg\n","") for name in utils.readText(fname)]
+        self.img_path = os.path.join(datadir, 'images')
+        self.point_path = os.path.join(datadir, 'annotations/85blocks_trees.shp')
+        self.img_names = [name.replace(".tif\n","").replace(".tif","") for name in utils.readText(fname)]
         print(self.img_names)
 
     def __len__(self):
@@ -38,16 +39,19 @@ class Denmark(data.Dataset):
 
     def __getitem__(self, index):
         name = self.img_names[index]
-
-        # LOAD IMG, POINT, and ROI
-        image = imread(os.path.join(self.path, name + ".jpg"))
+      
+        # oldscool reading
+        #image = imread(os.path.join(self.img_path, name + ".tif"))
         #image = np.delete(image, 3, 2)
-        points = loadPoints(self, name)[:,:,:1].clip(0,1)
         
+        src = rasterio.open(os.path.join(self.img_path, name + ".tif"))
+        # RGB image with first 3 bands
+        image = np.stack((src.read(1), src.read(2), src.read(3)), axis = 2)
+        # load points in this area
+        bounds = list(src.bounds)
+        points = loadPoints(self, bounds)[:,:,:1].clip(0,1)
         counts = torch.LongTensor(np.array([int(points.sum())]))   
-        
-        #unused variable
-        #collection = list(map(FT.to_pil_image, [image, points]))
+       
         image, points = transformers.applyTransform(self.split, image, points, transform_name = self.exp_dict['dataset']['transform'])
             
         return {"images":image, 
@@ -55,11 +59,8 @@ class Denmark(data.Dataset):
                 "counts":counts, 
                 'meta':{"index":index}}
     
-def loadPoints(self, name):
-    src = rasterio.open(os.path.join(self.path + "/tif/", name + ".tif"))
-    bounds = list(src.bounds)
-    
-    with fiona.open(os.path.join(self.path, "tif/85blocks_trees.shp")) as shapefile:
+def loadPoints(self, bounds):
+    with fiona.open(self.point_path) as shapefile:
         features = [feature["geometry"] for feature in shapefile]
     
     points = []
