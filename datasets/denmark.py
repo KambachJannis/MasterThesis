@@ -19,6 +19,9 @@ class Denmark(data.Dataset):
         self.split = split
         self.exp_dict = exp_dict
         self.n_classes = 1
+        self.n_patches = 40
+        self.tile_width = 250
+        self.tile_height = 250
         
         if split == "train":
             fname = os.path.join(datadir, 'image_sets', 'training.txt')
@@ -28,28 +31,47 @@ class Denmark(data.Dataset):
 
         elif split == "test":
             fname = os.path.join(datadir, 'image_sets', 'test.txt')
-
+        
+        # RASTERIO MASK mit Overlap 
         self.img_path = os.path.join(datadir, 'images')
         self.point_path = os.path.join(datadir, 'annotations/85blocks_trees.shp')
-        self.img_names = [name.replace(".tif\n","").replace(".tif","") for name in utils.readText(fname)]
+        
+        collection = []
+        for name in utils.readText(fname):
+            name_clean = name.replace(".tif\n","").replace(".tif","")
+            collection.extend([name_clean + '_' + str(n) for n in list(range(self.n_patches**2))])
+        
+        self.img_names = collection
         print(self.img_names)
 
     def __len__(self):
         return len(self.img_names)
 
     def __getitem__(self, index):
-        name = self.img_names[index]
-      
-        # oldscool reading
-        #image = imread(os.path.join(self.img_path, name + ".tif"))
-        #image = np.delete(image, 3, 2)
+        parts = self.img_names[index].split("_")
+        filename = '_'.join(parts[:-1])
+        tile_nr = parts[-1]
         
-        src = rasterio.open(os.path.join(self.img_path, name + ".tif"))
-        # RGB image with first 3 bands
-        image = np.stack((src.read(1), src.read(2), src.read(3)), axis = 2)
+        # open with RasterIO
+        src = rasterio.open(os.path.join(self.img_path, filename + ".tif"), window = window)
+        
+        # get window based on tile_nr
+        ncols, nrows = src.meta['width'], src.meta['height']
+        big_window = rio.windows.Window(col_off = 0, row_off = 0, width = ncols, height = nrows)
+        
+        col, row = tile_nr % self.n_patches, tile_nr // self.n_patches
+        h_overlap = ((self.n_patches * self.tile_width) - ncols) / (self.n_patches - 1)
+        v_overlap = ((self.n_patches * self.tile_height) - nrows) / (self.n_patches - 1)
+        col_off, row_off = col * (self.tile_width - v_overlap), row * (self.tile_height - h_overlap)
+        
+        window = rio.windows.Window(col_off = col_off, row_off = row_off, 
+                                    width = self.tile_height, height = self.tile_height).intersection(big_window)
+        transform = rio.windows.transform(window, src.transform)
+        
+        # RGB image
+        image = np.transpose(src.read(window = window)[:3])
         # load points in this area
-        bounds = list(src.bounds)
-        points = loadPoints(self, bounds)[:,:,:1].clip(0,1)
+        points = loadPoints(self, src)[:,:,:1].clip(0,1)
         counts = torch.LongTensor(np.array([int(points.sum())]))   
        
         image, points = transformers.applyTransform(self.split, image, points, transform_name = self.exp_dict['dataset']['transform'])
@@ -60,6 +82,7 @@ class Denmark(data.Dataset):
                 'meta':{"index":index}}
     
 def loadPoints(self, bounds):
+    # SHAPEFILE Selber in bounds einschränken
     with fiona.open(self.point_path) as shapefile:
         features = [feature["geometry"] for feature in shapefile]
     
@@ -78,3 +101,21 @@ def loadPoints(self, bounds):
         dots[8000-h][w] = [255, 0, 0]
         
     return dots
+
+def getTiles(src, width, height, vertical, horizontal):
+    ncols, nrows = src.meta['width'], src.meta['height']
+    big_window = rio.windows.Window(col_off = 0, row_off = 0, width = ncols, height = nrows)
+    
+    h_overlap = ((horizontal * width) - ncols) / (horizontal - 1)
+    v_overlap = ((vertical * height) - nrows) / (vertical - 1)
+    
+    for y in range(vertical):
+        row_off = y * (height - h_overlap)
+        for x in range(horizontal):
+            col_off = x * (width - v_overlap)
+            window = rio.windows.Window(col_off = col_off, row_off = row_off, width = width, height = height).intersection(big_window)
+            transform = rio.windows.transform(window, src.transform)
+            yield window, transform
+
+def generateMasks(self, src):
+    pass

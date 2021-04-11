@@ -62,9 +62,6 @@ def getPixelChecklist(points, probs):
         ids_labels = torch.where(pt_flat==1)[0]
         checklist += [{'scale': len(ids_labels), 'id_list': ids_labels, 'label': 1}]
         
-    ################ OBJECTNESS ######################
-    
-
     return checklist
 
 def objectnessLoss(probs):
