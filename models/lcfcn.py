@@ -119,7 +119,7 @@ class LCFCN(torch.nn.Module):
         logits = self.model_base.forward(images)
         # ??
         probs = logits.sigmoid().cpu().numpy()
-        blobs = lcfcn_loss.get_blobs(probs=probs)
+        blobs = lcfcn_loss.getBlobs(probs=probs)
         miscounts = abs(float((np.unique(blobs) !=0 ).sum() - (points != 0).sum()))
 
         return {'miscounts': miscounts}
@@ -132,7 +132,7 @@ class LCFCN(torch.nn.Module):
         logits = self.model_base.forward(images)
         probs = logits.sigmoid().cpu().numpy()
 
-        blobs = lcfcn_loss.get_blobs(probs=probs)
+        blobs = lcfcn_loss.getBlobs(probs=probs)
 
         #pred_counts = (np.unique(blobs)!=0).sum() unused var
         pred_blobs = blobs
@@ -151,7 +151,7 @@ class LCFCN(torch.nn.Module):
         haven_viz.text_on_image(text=text, image=img_peaks)
 
         # pred points 
-        pred_points = lcfcn_loss.blobs2points(pred_blobs).squeeze()
+        pred_points = lcfcn_loss.blobsToPoints(pred_blobs).squeeze()
         y_list, x_list = np.where(pred_points.squeeze())
         img_pred = haven_viz.mask_on_image(img_org, pred_blobs)
         # img_pred = haven_img.points_on_image(y_list, x_list, img_org)

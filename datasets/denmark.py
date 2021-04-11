@@ -6,7 +6,7 @@ import torchvision.transforms.functional as FT
 import numpy as np
 # Image Handling
 import fiona
-import rasterio
+import rasterio as rio
 from skimage.io import imread
 # Custom
 from helpers import utils
@@ -42,7 +42,6 @@ class Denmark(data.Dataset):
             collection.extend([name_clean + '_' + str(n) for n in list(range(self.n_patches**2))])
         
         self.img_names = collection
-        print(self.img_names)
 
     def __len__(self):
         return len(self.img_names)
@@ -50,28 +49,30 @@ class Denmark(data.Dataset):
     def __getitem__(self, index):
         parts = self.img_names[index].split("_")
         filename = '_'.join(parts[:-1])
-        tile_nr = parts[-1]
+        tile_nr = int(parts[-1])
+        width = self.tile_width
+        height = self.tile_height
         
         # open with RasterIO
-        src = rasterio.open(os.path.join(self.img_path, filename + ".tif"), window = window)
-        
-        # get window based on tile_nr
+        src = rio.open(os.path.join(self.img_path, filename + ".tif"))
         ncols, nrows = src.meta['width'], src.meta['height']
         big_window = rio.windows.Window(col_off = 0, row_off = 0, width = ncols, height = nrows)
         
+        # get window based on tile_nr
         col, row = tile_nr % self.n_patches, tile_nr // self.n_patches
-        h_overlap = ((self.n_patches * self.tile_width) - ncols) / (self.n_patches - 1)
-        v_overlap = ((self.n_patches * self.tile_height) - nrows) / (self.n_patches - 1)
-        col_off, row_off = col * (self.tile_width - v_overlap), row * (self.tile_height - h_overlap)
+        h_overlap = ((self.n_patches * width) - ncols) / (self.n_patches - 1)
+        v_overlap = ((self.n_patches * height) - nrows) / (self.n_patches - 1)
+        col_off, row_off = int(col * (width - v_overlap)), int(row * (height - h_overlap))
         
         window = rio.windows.Window(col_off = col_off, row_off = row_off, 
-                                    width = self.tile_height, height = self.tile_height).intersection(big_window)
-        transform = rio.windows.transform(window, src.transform)
+                                    width = width, height = height).intersection(big_window)
         
         # RGB image
         image = np.transpose(src.read(window = window)[:3])
         # load points in this area
-        points = loadPoints(self, src)[:,:,:1].clip(0,1)
+        points = loadPoints(self, list(src.bounds))[:,:,:1].clip(0,1)
+        row_upper, col_upper = int(row_off + height), int(col_off + width)
+        points = points[row_off : row_upper,col_off : col_upper]
         counts = torch.LongTensor(np.array([int(points.sum())]))   
        
         image, points = transformers.applyTransform(self.split, image, points, transform_name = self.exp_dict['dataset']['transform'])
@@ -83,6 +84,7 @@ class Denmark(data.Dataset):
     
 def loadPoints(self, bounds):
     # SHAPEFILE Selber in bounds einschränken
+    
     with fiona.open(self.point_path) as shapefile:
         features = [feature["geometry"] for feature in shapefile]
     

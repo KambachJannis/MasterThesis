@@ -69,11 +69,11 @@ def getPixelChecklist(points, probs, roi_mask=None):
     blobs = getBlobs(probs_numpy, roi_mask=None)
     # get foreground and background blob ids
     foreground_blobs = np.unique(blobs * points_numpy) # mult with points = eliminate background
-    background_blobs = [x for x in np.unique(blobs) if x not in foreground_uniques]
+    background_blobs = [x for x in np.unique(blobs) if x not in foreground_blobs]
     
     if points_numpy.sum() > 1:
         # GLOBAL SPLIT
-        boundaries = ski_watersplit(probs_numpy, points_numpy)
+        boundaries = watersplit(probs_numpy, points_numpy)
         # get ids of boundary lines on flat array
         ids_boundaries = np.where(boundaries.ravel())[0]
         checklist += [{'scale': (points_numpy.sum()-1), 'id_list': ids_boundaries, 'label': 0}]  #boundaries = background = 0
@@ -98,7 +98,7 @@ def getPixelChecklist(points, probs, roi_mask=None):
     ################ FALSE POSITIVE LEVEL ######################
     for blob in background_blobs:
         # not background itself
-        if u == 0:
+        if blob == 0:
             continue
         # bool matrix with False where other blobs are, True for blob and background
         blob_mask = blobs==blob
@@ -170,7 +170,7 @@ def blobsToPoints(blobs):
     # iterate through regions (blobs)
     for blob in region_properties:
         # find central point
-        y, x = r.centroid
+        y, x = blob.centroid
         # add point to empty array
         points[int(y), int(x)] = 1
 
