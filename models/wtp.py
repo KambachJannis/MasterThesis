@@ -6,6 +6,7 @@ from models import base
 from helpers import metrics
 from helpers import haven_viz
 from models.losses import wtp_loss
+import matlab.engine
 
 class WTP(torch.nn.Module):
     def __init__(self, exp_dict, train_set):
@@ -35,7 +36,10 @@ class WTP(torch.nn.Module):
     def trainOnLoader(self, model, train_loader):
         # ???
         model.train()
-
+        # start matlab engine
+        eng = matlab.engine.start_matlab()
+        eng.addpath('/home/jovyan/work/ma/helpers/objectness_src', nargout=0)
+        eng.addpath('/home/jovyan/work/ma/helpers/objectness_src/pff_segment', nargout=0)
         # Prepare Variables
         n_batches = len(train_loader)
         train_meter = metrics.Meter()
@@ -44,7 +48,7 @@ class WTP(torch.nn.Module):
         # MAIN LOOP
         for batch in train_loader:
             # Train on Batch
-            score_dict = model.trainOnBatch(batch)
+            score_dict = model.trainOnBatch(batch, eng)
             # Save Loss
             train_meter.add(score_dict['train_loss'], batch['images'].shape[0])
             # Update PBar
@@ -56,7 +60,7 @@ class WTP(torch.nn.Module):
 
         return {'train_loss': overall_loss}
     
-    def trainOnBatch(self, batch, **extras):
+    def trainOnBatch(self, batch, eng, **extras):
         # Zero the gradients 
         self.opt.zero_grad()
         # ???
@@ -69,7 +73,7 @@ class WTP(torch.nn.Module):
         # Forward Prop
         logits = self.model_base.forward(images)
         # Calculate Loss
-        loss = wtp_loss.computeLoss(points = points, probs = logits.sigmoid())
+        loss = wtp_loss.computeLoss(points = points, probs = logits.sigmoid(), images = batch["meta"]["path"][0], eng = eng)
         # Backprop
         loss.backward()
         # Optimize
@@ -119,7 +123,7 @@ class WTP(torch.nn.Module):
         logits = self.model_base.forward(images)
         # ??
         probs = logits.sigmoid().cpu().numpy()
-        blobs = lcfcn_loss.get_blobs(probs=probs)
+        blobs = wtp_loss.getBlobs(probs=probs)
         miscounts = abs(float((np.unique(blobs) !=0 ).sum() - (points != 0).sum()))
 
         return {'miscounts': miscounts}
@@ -132,7 +136,7 @@ class WTP(torch.nn.Module):
         logits = self.model_base.forward(images)
         probs = logits.sigmoid().cpu().numpy()
 
-        blobs = lcfcn_loss.get_blobs(probs=probs)
+        blobs = wtp_loss.getBlobs(probs=probs)
 
         #pred_counts = (np.unique(blobs)!=0).sum() unused var
         pred_blobs = blobs
@@ -151,7 +155,7 @@ class WTP(torch.nn.Module):
         haven_viz.text_on_image(text=text, image=img_peaks)
 
         # pred points 
-        pred_points = lcfcn_loss.blobs2points(pred_blobs).squeeze()
+        pred_points = wtp_loss.blobsToPoints(pred_blobs).squeeze()
         y_list, x_list = np.where(pred_points.squeeze())
         img_pred = haven_viz.mask_on_image(img_org, pred_blobs)
         # img_pred = haven_img.points_on_image(y_list, x_list, img_org)

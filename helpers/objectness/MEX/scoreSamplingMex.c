@@ -22,15 +22,15 @@ void mexFunction( int nlhs, mxArray *plhs[],
     /* Check for proper number of arguments */
     
     if (nrhs != 3) {
-     mexErrMsgTxt("3 input argument required: scoreVector, numberSamples, replacementOption ");
+     mexErrMsgIdAndTxt("someerror", "3 input argument required: scoreVector, numberSamples, replacementOption ");
     } 
     else if (nlhs > 2) {
-     mexErrMsgTxt("Too many output arguments.");
+     mexErrMsgIdAndTxt("someerror", "Too many output arguments.");
     }
 
     if ( !mxIsDouble(prhs[0]) || mxIsComplex(prhs[0]) ||
 		mxGetNumberOfDimensions(prhs[0]) != 2 )
-		mexErrMsgTxt("input 1 (X) must be a real double scoreVector");
+		mexErrMsgIdAndTxt("someerror", "input 1 (X) must be a real double scoreVector");
  
     scoreVector = mxGetPr(prhs[0]);
     numberSamples = mxGetScalar(prhs[1]);
@@ -38,7 +38,7 @@ void mexFunction( int nlhs, mxArray *plhs[],
     lengthScoreVector = MAX(mxGetN(prhs[0]),mxGetM(prhs[0])); 
     
     if((option == 0) && (numberSamples > lengthScoreVector))
-                mexErrMsgTxt("numberSamples <= length scoreVector (sampling without replacement)");
+                mexErrMsgIdAndTxt("someerror", "numberSamples <= length scoreVector (sampling without replacement)");
 
     /* Create return arguments */
     

@@ -30,9 +30,9 @@ void mexFunction( int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[] )
 
     /* Check for proper number of arguments */    
     if (nrhs != 10) {
-    mexErrMsgTxt("10 input argument required.");
+    mexErrMsgIdAndTxt("someerror", "10 input argument required.");
     } else if (nlhs > 1) {
-    mexErrMsgTxt("Too many output arguments.");
+    mexErrMsgIdAndTxt("someerror", "Too many output arguments.");
     }
     
     integralHistogram = mxGetPr(prhs[0]);
@@ -49,7 +49,7 @@ void mexFunction( int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[] )
 
     if (!mxIsDouble(prhs[0]) || mxIsComplex(prhs[0]) ||
 		mxGetNumberOfDimensions(prhs[0]) != 2 || mxGetN(prhs[0]) != (height+1)*(width+1))
-		mexErrMsgTxt("input 1 (integralHistogram) must be a real double matrix");
+		mexErrMsgIdAndTxt("someerror", "input 1 (integralHistogram) must be a real double matrix");
     
     plhs[0] = mxCreateDoubleMatrix(numberWindows,1,mxREAL);
     
@@ -69,7 +69,7 @@ void mexFunction( int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[] )
         sum_inside = 0;
         
     	if((objWidth<=0)||(objHeight<=0))
-      		mxErrMsgTxt("error xmax - xmin <=0 or ymax - ymin<=0");  
+      		mexErrMsgIdAndTxt("someerror", "error xmax - xmin <=0 or ymax - ymin<=0");  
               
         maxmax = (int)(prodQuant*(xmax[w]*(height+1)+ymax[w]));
         minmin = (int)(prodQuant*((xmin[w]-1)*(height+1)+ymin[w]-1));

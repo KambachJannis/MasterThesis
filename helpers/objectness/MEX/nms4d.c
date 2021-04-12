@@ -23,15 +23,15 @@ void mexFunction( int nlhs, mxArray *plhs[],
     /* Check for proper number of arguments */
     
     if (nrhs != 4) {
-     mexErrMsgTxt("4 input arguments required.");
+     mexErrMsgIdAndTxt("someerror", "4 input arguments required.");
     } 
     else if (nlhs != 5) {
-     mexErrMsgTxt("5 output arguments required");
+     mexErrMsgIdAndTxt("someerror", "5 output arguments required");
     }
 
     if ( !mxIsDouble(prhs[0]) || mxIsComplex(prhs[0]) ||
 		mxGetNumberOfDimensions(prhs[0]) != 2 )
-		mexErrMsgTxt("input 1 (h) must be a real double matrix");
+		mexErrMsgIdAndTxt("someerror", "input 1 (h) must be a real double matrix");
     
 
     score = mxGetPr(prhs[0]);/* score  */

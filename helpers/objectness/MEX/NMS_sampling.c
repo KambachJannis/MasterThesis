@@ -20,9 +20,9 @@ void mexFunction( int nlhs, mxArray *plhs[], int nrhs, const mxArray *prhs[] )
     
     /* Check for proper number of arguments */    
     if (nrhs != 7) {
-    mexErrMsgTxt("7 input argument required.");
+    mexErrMsgIdAndTxt("someerror", "7 input argument required.");
     } else if (nlhs > 2) {
-    mexErrMsgTxt("Too many output arguments.");
+    mexErrMsgIdAndTxt("someerror", "Too many output arguments.");
     }        
     
     area = mxGetPr(prhs[0]);

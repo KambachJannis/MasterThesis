@@ -118,6 +118,3 @@ def getTiles(src, width, height, vertical, horizontal):
             window = rio.windows.Window(col_off = col_off, row_off = row_off, width = width, height = height).intersection(big_window)
             transform = rio.windows.transform(window, src.transform)
             yield window, transform
-
-def generateMasks(self, src):
-    pass

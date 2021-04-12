@@ -1,8 +1,9 @@
 import torch
 import numpy as np
 import torch.nn.functional as F
+from helpers import objectness
 
-def computeLoss(points, probs):
+def computeLoss(points, probs, images, eng):
     """
     points: n x c x h x w
     probs: h x w (0 or 1)
@@ -27,7 +28,7 @@ def computeLoss(points, probs):
         loss += item['scale'] * F.binary_cross_entropy(item_ids, item_labels, reduction='mean')
     
     # add objectness loss
-    objectness = objectnessLoss(points, probs)
+    objectness = objectnessLoss(probs, images, eng)
     print(f"base loss: {loss} - objectness: {objectness}")
     loss += objectness
     
@@ -64,8 +65,12 @@ def getPixelChecklist(points, probs):
         
     return checklist
 
-def objectnessLoss(probs):
-    objectness = getObjectness()
+def objectnessLoss(probs, images, eng):
+    #converts image into a 2D greyscale objectness heatmap
+    print(images)
+    heatmap = np.asarray(eng.getHeatMap(str(images)))
+    objectness = torch.tensor(heatmap[:,:,2:])
+    
     objectness_flat = objectness.view(-1)
     pr_flat = probs.view(-1)
     n = len(pr_flat)
@@ -78,6 +83,43 @@ def objectnessLoss(probs):
     score = (score_background + score_foreground) / n
     
     return score
+
+def getBlobs(probs, roi_mask=None):
+    ''' 
+    Assignes unique numbers to connected high-probability regions.
+    Essentially a transformation of the probability matrix.
     
-def getObjectness(): #MATLAB ENGINE MISSING
-    pass
+    '''
+    probs = probs.squeeze()
+    h, w = probs.shape
+    # zeros matrix with probs shape
+    blobs = np.zeros((h, w), int)
+    # discard unlikely regions
+    pred_mask = (probs>0.5).astype('uint8')
+    # connected pixel groups get assigned a unique number
+    blobs = ski_label(pred_mask == 1)
+    # subtract RoI mask if given
+    if roi_mask is not None:
+        blobs = (blobs * roi_mask[None]).astype(int)
+
+    return blobs
+        
+def blobsToPoints(blobs):
+    ''' 
+    Exports map of blob centroids.
+    
+    '''
+    blobs = blobs.squeeze()
+    # init zeros array
+    points = np.zeros(blobs.shape).astype("uint8")
+    assert points.ndim == 2
+    # returns a list of labeled regions with their properties
+    region_properties = ski_regions(blobs)
+    # iterate through regions (blobs)
+    for blob in region_properties:
+        # find central point
+        y, x = blob.centroid
+        # add point to empty array
+        points[int(y), int(x)] = 1
+
+    return points

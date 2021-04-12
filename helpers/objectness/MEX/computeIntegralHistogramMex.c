@@ -14,15 +14,15 @@ void mexFunction( int nlhs, mxArray *plhs[],
     /* Check for proper number of arguments */
     
     if (nrhs != 4) {
-     mexErrMsgTxt("4 input argument required.");
+     mexErrMsgIdAndTxt("someerror", "4 input argument required.");
     } 
     else if (nlhs > 1) {
-     mexErrMsgTxt("Too many output arguments.");
+     mexErrMsgIdAndTxt("someerror", "Too many output arguments.");
     }
 
     if ( !mxIsDouble(prhs[0]) || mxIsComplex(prhs[0]) ||
 		mxGetNumberOfDimensions(prhs[1]) != 2 )
-		mexErrMsgTxt("input 1 (quantMatrix) must be a real double matrix");
+		mexErrMsgIdAndTxt("someerror", "input 1 (quantMatrix) must be a real double matrix");
    
     quantMatrix = mxGetPr(prhs[0]);
     height = mxGetScalar(prhs[1]);

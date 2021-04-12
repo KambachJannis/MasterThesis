@@ -56,7 +56,8 @@ class Trancos(data.Dataset):
         return {"images":image, 
                 "points":points.squeeze(), 
                 "counts":counts, 
-                'meta':{"index":index}}
+                'meta':{"index":index, 
+                        "path":os.path.join(self.path, name + ".jpg")}}
 
 def shrink2RoI(img, roi):
     """[summary]
