@@ -5,8 +5,6 @@ import torchvision.transforms.functional as FT
 # Data Handling
 import numpy as np
 # Image Handling
-import fiona
-import rasterio as rio
 from skimage.io import imread
 # Custom
 from helpers import utils
@@ -19,9 +17,6 @@ class Denmark(data.Dataset):
         self.split = split
         self.exp_dict = exp_dict
         self.n_classes = 1
-        self.n_patches = 40
-        self.tile_width = 250
-        self.tile_height = 250
         
         if split == "train":
             fname = os.path.join(datadir, 'image_sets', 'training.txt')
@@ -32,47 +27,28 @@ class Denmark(data.Dataset):
         elif split == "test":
             fname = os.path.join(datadir, 'image_sets', 'test.txt')
         
-        # RASTERIO MASK mit Overlap 
+        self.img_names = [name.replace(".jpg\n","").replace(".jpg","") for name in utils.readText(fname)]
         self.img_path = os.path.join(datadir, 'images')
-        self.point_path = os.path.join(datadir, 'annotations/85blocks_trees.shp')
-        
-        collection = []
-        for name in utils.readText(fname):
-            name_clean = name.replace(".tif\n","").replace(".tif","")
-            collection.extend([name_clean + '_' + str(n) for n in list(range(self.n_patches**2))])
-        
-        self.img_names = collection
+        self.points_path = os.path.join(datadir, 'points')
 
     def __len__(self):
         return len(self.img_names)
 
     def __getitem__(self, index):
-        parts = self.img_names[index].split("_")
-        filename = '_'.join(parts[:-1])
-        tile_nr = int(parts[-1])
-        width = self.tile_width
-        height = self.tile_height
+        name = self.img_names[index]
         
-        # open with RasterIO
-        src = rio.open(os.path.join(self.img_path, filename + ".tif"))
-        ncols, nrows = src.meta['width'], src.meta['height']
-        big_window = rio.windows.Window(col_off = 0, row_off = 0, width = ncols, height = nrows)
+        # LOAD IMG, POINT
+        image = imread(os.path.join(self.img_path, name + ".jpg"))
+        nrows, ncols = len(image), len(image[0]) 
         
-        # get window based on tile_nr
-        col, row = tile_nr % self.n_patches, tile_nr // self.n_patches
-        h_overlap = ((self.n_patches * width) - ncols) / (self.n_patches - 1)
-        v_overlap = ((self.n_patches * height) - nrows) / (self.n_patches - 1)
-        col_off, row_off = int(col * (width - v_overlap)), int(row * (height - h_overlap))
+        points = np.zeros((nrows, ncols, 1), dtype = int)
+        points_path = os.path.join(self.points_path, name + "_points.npy")
+        if os.path.isfile(points_path): 
+            points_src = np.load(points_path)
+            for point in points_src:
+                w, h = point[0], point[1]
+                points[nrows-h][w] = [1]
         
-        window = rio.windows.Window(col_off = col_off, row_off = row_off, 
-                                    width = width, height = height).intersection(big_window)
-        
-        # RGB image
-        image = np.transpose(src.read(window = window)[:3])
-        # load points in this area
-        points = loadPoints(self, list(src.bounds))[:,:,:1].clip(0,1)
-        row_upper, col_upper = int(row_off + height), int(col_off + width)
-        points = points[row_off : row_upper,col_off : col_upper]
         counts = torch.LongTensor(np.array([int(points.sum())]))   
        
         image, points = transformers.applyTransform(self.split, image, points, transform_name = self.exp_dict['dataset']['transform'])
@@ -81,40 +57,3 @@ class Denmark(data.Dataset):
                 "points":points.squeeze(), 
                 "counts":counts, 
                 'meta':{"index":index}}
-    
-def loadPoints(self, bounds):
-    # SHAPEFILE Selber in bounds einschränken
-    
-    with fiona.open(self.point_path) as shapefile:
-        features = [feature["geometry"] for feature in shapefile]
-    
-    points = []
-    for point in features:
-        coords = list(point['coordinates'][:2])
-        if (bounds[0] < coords[0] < bounds[2]) and (bounds[1] < coords[1] < bounds[3]):
-            coords[0] = round((coords[0] - bounds[0])*8)
-            coords[1] = round((coords[1] - bounds[1])*8)
-            points.append(coords)
-        
-    dots = np.zeros((8000, 8000, 3), dtype = int)
-    for point in points:
-        w = point[0]
-        h = point[1]
-        dots[8000-h][w] = [255, 0, 0]
-        
-    return dots
-
-def getTiles(src, width, height, vertical, horizontal):
-    ncols, nrows = src.meta['width'], src.meta['height']
-    big_window = rio.windows.Window(col_off = 0, row_off = 0, width = ncols, height = nrows)
-    
-    h_overlap = ((horizontal * width) - ncols) / (horizontal - 1)
-    v_overlap = ((vertical * height) - nrows) / (vertical - 1)
-    
-    for y in range(vertical):
-        row_off = y * (height - h_overlap)
-        for x in range(horizontal):
-            col_off = x * (width - v_overlap)
-            window = rio.windows.Window(col_off = col_off, row_off = row_off, width = width, height = height).intersection(big_window)
-            transform = rio.windows.transform(window, src.transform)
-            yield window, transform

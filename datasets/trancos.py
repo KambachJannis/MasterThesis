@@ -28,7 +28,7 @@ class Trancos(data.Dataset):
         elif split == "test":
             fname = os.path.join(datadir, 'image_sets', 'test.txt')
 
-        self.img_names = [name.replace(".jpg\n","") for name in utils.readText(fname)]
+        self.img_names = [name.replace(".jpg\n","").replace(".jpg","") for name in utils.readText(fname)]
         self.path = os.path.join(datadir, 'images')
 
     def __len__(self):

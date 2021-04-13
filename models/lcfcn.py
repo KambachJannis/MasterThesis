@@ -88,7 +88,7 @@ class LCFCN(torch.nn.Module):
         pbar = tqdm.tqdm(total=n_batches)
         
         # MAIN LOOP
-        for i, batch in enumerate(tqdm.tqdm(val_loader)):
+        for i, batch in enumerate(val_loader):
             # Validate on Batch
             score_dict = self.valOnBatch(batch)
             # Save Score
