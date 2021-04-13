@@ -38,7 +38,8 @@ class Denmark(data.Dataset):
         name = self.img_names[index]
         
         # LOAD IMG, POINT
-        image = imread(os.path.join(self.img_path, name + ".jpg"))
+        #image = imread(os.path.join(self.img_path, name + ".jpg"))
+        image = np.load(os.path.join(self.img_path, name + ".npy"))
         nrows, ncols = len(image), len(image[0]) 
         
         points = np.zeros((nrows, ncols, 1), dtype = int)
