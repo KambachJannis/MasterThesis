@@ -38,8 +38,8 @@ class Denmark(data.Dataset):
         name = self.img_names[index]
         
         # LOAD IMG, POINT
-        #image = imread(os.path.join(self.img_path, name + ".jpg"))
-        image = np.load(os.path.join(self.img_path, name + ".npy"))
+        image = imread(os.path.join(self.img_path, name + ".jpg"))
+        #image = np.load(os.path.join(self.img_path, name + ".npy"))
         nrows, ncols = len(image), len(image[0]) 
         
         points = np.zeros((nrows, ncols, 1), dtype = int)
@@ -48,7 +48,7 @@ class Denmark(data.Dataset):
             points_src = np.load(points_path)
             for point in points_src:
                 w, h = point[0], point[1]
-                points[nrows-h][w] = [1]
+                points[h-1][w-1] = [1]
         
         counts = torch.LongTensor(np.array([int(points.sum())]))   
        
