@@ -1,7 +1,10 @@
+import os
 import torch
 import numpy as np
-import torch.nn.functional as F
 from helpers import objectness
+import torch.nn.functional as F
+from skimage.morphology import label as ski_label
+from skimage.measure import regionprops as ski_regions
 
 def computeLoss(points, probs, images, eng):
     """
@@ -29,7 +32,6 @@ def computeLoss(points, probs, images, eng):
     
     # add objectness loss
     objectness = objectnessLoss(probs, images, eng)
-    print(f"base loss: {loss} - objectness: {objectness}")
     loss += objectness
     
     return loss
@@ -67,20 +69,22 @@ def getPixelChecklist(points, probs):
 
 def objectnessLoss(probs, images, eng):
     #converts image into a 2D greyscale objectness heatmap
-    print(images)
-    heatmap = np.asarray(eng.getHeatMap(str(images)))
-    objectness = torch.tensor(heatmap[:,:,2:])
+    #path = os.path.join("/home/jovyan/work/data/DENMARK/250x250/images", images)
+    #path = os.path.join("/home/jovyan/work/data/TRANCOS/images", images)
+    heatmap = np.asarray(eng.getHeatMap(images, 100))
+    objectness = torch.tensor(np.uint8(heatmap * 255))
     
     objectness_flat = objectness.view(-1)
     pr_flat = probs.view(-1)
     n = len(pr_flat)
     
-    ids_background = torch.where(pr_flat == 0)[0]
-    ids_foreground = torch.where(pr_flat == 1)[0]
+    ids_background = torch.where(pr_flat <= 0.5)[0]
+    ids_foreground = torch.where(pr_flat > 0.5)[0]
     
-    score_background = torch.sum(torch.log(objectness_flat[ids_background]))
-    score_foreground = torch.sum(torch.log(1 - objectness_flat[ids_foreground]))
-    score = (score_background + score_foreground) / n
+    score_background = torch.sum(objectness_flat[ids_background])
+    score_foreground = torch.sum(objectness_flat[ids_foreground])
+    
+    score = (score_background - score_foreground) / n
     
     return score
 

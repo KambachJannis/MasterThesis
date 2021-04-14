@@ -57,4 +57,5 @@ class Denmark(data.Dataset):
         return {"images":image, 
                 "points":points.squeeze(), 
                 "counts":counts, 
-                'meta':{"index":index}}
+                'meta':{"index":index,
+                        "path":os.path.join(self.img_path, name + ".jpg")}}

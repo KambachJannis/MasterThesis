@@ -1,4 +1,4 @@
-function objHeatMap = getHeatMap(path)
+function objHeatMap = getHeatMap(path,windows)
 
 %compute the objectness heat map for an image
 %INPUT:
@@ -6,7 +6,7 @@ function objHeatMap = getHeatMap(path)
 %windows - objectness windows (computed using function runObjectness.m)
 
 img = imread(path);
-windows = runObjectness(img,10);
+windows = runObjectness(img,windows);
 
 map = zeros(size(img,1),size(img,2));
 
@@ -23,7 +23,8 @@ end
 
 gray = mat2gray(map);
 X = gray2ind(gray,256);
-objHeatMap = ind2rgb(X,jet(256));
+Y = ind2rgb(X,jet(256));
+objHeatMap = gray;
 figure;
 subplot(2,1,1),imshow(img),title('Input image');
 subplot(2,1,2),imshow(objHeatMap);title('Objectness heat map');

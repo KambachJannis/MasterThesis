@@ -38,8 +38,9 @@ class WTP(torch.nn.Module):
         model.train()
         # start matlab engine
         eng = matlab.engine.start_matlab()
-        eng.addpath('/home/jovyan/work/ma/helpers/objectness_src', nargout=0)
-        eng.addpath('/home/jovyan/work/ma/helpers/objectness_src/pff_segment', nargout=0)
+        eng.addpath('/home/jovyan/work/ma/helpers/objectness', nargout=0)
+        eng.addpath('/home/jovyan/work/ma/helpers/objectness/pff_segment', nargout=0)
+        eng.addpath('/home/jovyan/work/ma/helpers/objectness/MEX', nargout=0)
         # Prepare Variables
         n_batches = len(train_loader)
         train_meter = metrics.Meter()
@@ -57,6 +58,7 @@ class WTP(torch.nn.Module):
 
         overall_loss = train_meter.get_avg_score()
         pbar.close()
+        eng.quit()
 
         return {'train_loss': overall_loss}
     
@@ -92,7 +94,7 @@ class WTP(torch.nn.Module):
         pbar = tqdm.tqdm(total=n_batches)
         
         # MAIN LOOP
-        for i, batch in enumerate(tqdm.tqdm(val_loader)):
+        for i, batch in enumerate(val_loader):
             # Validate on Batch
             score_dict = self.valOnBatch(batch)
             # Save Score
