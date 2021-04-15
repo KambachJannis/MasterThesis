@@ -111,7 +111,7 @@ def getPixelChecklist(points, probs, roi_mask=None):
         else:
             # get ids of all the background pixels in RoI
             ids_background = np.where(blob_mask.ravel())[0]
-            checklist += [{'scale': 1, 'id_list': ids_background, 'label': 0}]  
+            checklist += [{'scale': 1.1, 'id_list': ids_background, 'label': 0}]  
 
     return checklist 
 

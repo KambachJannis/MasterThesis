@@ -8,11 +8,12 @@ def applyTransform(split, image, points, transform_name='basic', exp_dict=None):
     if transform_name == 'rgb_normalize':
         mean = [0.485, 0.456, 0.406]
         std = [0.229, 0.224, 0.225]
+        # Transformation Sequence - 1st Function in each sub-list applies to image, 2nd to points
         transform = ComposeJoint(
             [
-                [transforms.ToTensor(), None],
-                [transforms.Normalize(mean=mean, std=std), None],
-                [None, ToLong()]
+                [transforms.ToTensor(), None], #convert image to Tensor
+                [transforms.Normalize(mean=mean, std=std), None], #normalize Image Tensor
+                [None, ToLong()] # convert Points to Long Tensor (still binary)
             ])
 
         return transform([image, points])
@@ -29,6 +30,7 @@ class ComposeJoint(object):
 
     def _iterate_transforms(self, transforms, x):
         if isinstance(transforms, collections.Iterable):
+            # split operations for image and points
             for i, transform in enumerate(transforms):
                 x[i] = self._iterate_transforms(transform, x[i])
         else:

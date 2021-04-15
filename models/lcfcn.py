@@ -59,7 +59,7 @@ class LCFCN(torch.nn.Module):
     def trainOnBatch(self, batch, **extras):
         # Zero the gradients 
         self.opt.zero_grad()
-        # ???
+        # Declare Training Mode
         self.train()
 
         # Load Data to GPU
@@ -79,7 +79,7 @@ class LCFCN(torch.nn.Module):
 
     @torch.no_grad()
     def valOnLoader(self, val_loader, savedir_images = None, n_images = 2):
-        # ???
+        # Declare Eval Mode
         self.eval()
         
         # Prepare Variables
