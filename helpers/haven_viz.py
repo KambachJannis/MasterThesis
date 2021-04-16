@@ -47,8 +47,6 @@ def save_image(fname, img, denorm=None, size=None, points=None, radius=10,
     if mask is not None:
         img = mask_on_image(mask, img)
 
-    
-
     if img.dtype == 'uint8':
         img = Image.fromarray(img)
     else:
@@ -117,67 +115,6 @@ def mask_on_image(image, mask, add_bbox=False, return_pil=False):
 
     return result
 
-def f2l(X):
-    """Move the channels from the first dimension to the last dimension.
-`   Parameters
-    ----------
-    X : Numpy array
-        Tensor with the channel dimension at the first dimension
-    Returns
-    -------
-    Numpy array
-        X transformed with the channel dimension at the last dimension
-    """
-    if X.ndim == 3 and (X.shape[2] == 3 or X.shape[2] == 1):
-        return X
-    if X.ndim == 4 and (X.shape[3] == 3 or X.shape[3] == 1):
-        return X
-
-    # Move the channel dimension from the first position to the last one
-    if X.ndim == 3:
-        return np.transpose(X, (1, 2, 0))
-    if X.ndim == 4:
-        return np.transpose(X, (0, 2, 3, 1))
-
-    return X
-
-def gray2cmap(gray, cmap="jet", thresh=0):
-    """gets a heatmap for a given gray image. Can be used to visualize probabilities.
-    
-    Parameters
-    ----------
-    gray : [type]
-        [description]
-    cmap : str, optional
-        [description], by default "jet"
-    thresh : int, optional
-        [description], by default 0
-    
-    Returns
-    -------
-    [type]
-        [description]
-    """
-    # Gray has values between 0 and 255 or 0 and 1
-    gray = t2n(gray)
-    gray = gray / max(1, gray.max())
-    gray = np.maximum(gray - thresh, 0)
-    gray = gray / max(1, gray.max())
-    gray = gray * 255
-
-    gray = gray.astype(int)
-    #print(gray)
-
-    from matplotlib.cm import get_cmap
-    cmap = get_cmap(cmap)
-
-    output = np.zeros(gray.shape + (3, ), dtype=np.float64)
-
-    for c in np.unique(gray):
-        output[(gray == c).nonzero()] = cmap(c)[:3]
-
-    return l2f(output)
-
 def text_on_image(text, image):
     """Adds test on the image
     
@@ -243,22 +180,45 @@ def points_on_image(y_list, x_list, image, radius=3, c_list=None):
         if c_list is not None:
             color = color_list[c_list[i]] 
         else:
-            color = color_list[1] 
+            color = color_list[2] 
         
         # Line thickness of 2 px 
-        thickness = 5
+        thickness = 2
         # Using cv2.rectangle() method 
         # Draw a rectangle with blue line borders of thickness of 2 px 
-        image_uint8 = cv2.circle(image_uint8, (x,y), radius, color, thickness) 
+        image_uint8 = cv2.circle(image_uint8, (x,y), 2, color, thickness) 
 
         start_point = (x-radius*2, y-radius*2) 
         end_point = (x+radius*2, y+radius*2) 
         thickness = 2
         color = (255, 0, 0)
         
-        image_uint8 = cv2.rectangle(image_uint8, start_point, end_point, color, thickness) 
+        #image_uint8 = cv2.rectangle(image_uint8, start_point, end_point, color, thickness) 
 
     return image_uint8 / 255.
+
+def image_as_uint8(img):
+    """Returns a uint8 version of the image
+    
+    Parameters
+    ----------
+    img : [type]
+        [description]
+    
+    Returns
+    -------
+    [type]
+        [description]
+    """
+    image = f2l(np.array(img).squeeze())
+    
+    if image.dtype != 'uint8':
+        image_uint8 = (image*255).astype("uint8").copy()
+    else:
+        image_uint8 = image 
+
+    return image_uint8
+
 
 def denormalize(img, mode=0):  # TODO: Remove the default value or set to a valid number, complete documentation
     """Denormalize an image.
@@ -373,24 +333,63 @@ def l2f(X):
 
     return X
 
-def image_as_uint8(img):
-    """Returns a uint8 version of the image
+def f2l(X):
+    """Move the channels from the first dimension to the last dimension.
+`   Parameters
+    ----------
+    X : Numpy array
+        Tensor with the channel dimension at the first dimension
+    Returns
+    -------
+    Numpy array
+        X transformed with the channel dimension at the last dimension
+    """
+    if X.ndim == 3 and (X.shape[2] == 3 or X.shape[2] == 1):
+        return X
+    if X.ndim == 4 and (X.shape[3] == 3 or X.shape[3] == 1):
+        return X
+
+    # Move the channel dimension from the first position to the last one
+    if X.ndim == 3:
+        return np.transpose(X, (1, 2, 0))
+    if X.ndim == 4:
+        return np.transpose(X, (0, 2, 3, 1))
+
+    return X
+
+def gray2cmap(gray, cmap="jet", thresh=0):
+    """gets a heatmap for a given gray image. Can be used to visualize probabilities.
     
     Parameters
     ----------
-    img : [type]
+    gray : [type]
         [description]
+    cmap : str, optional
+        [description], by default "jet"
+    thresh : int, optional
+        [description], by default 0
     
     Returns
     -------
     [type]
         [description]
     """
-    image = f2l(np.array(img).squeeze())
-    
-    if image.dtype != 'uint8':
-        image_uint8 = (image*255).astype("uint8").copy()
-    else:
-        image_uint8 = image 
+    # Gray has values between 0 and 255 or 0 and 1
+    gray = t2n(gray)
+    gray = gray / max(1, gray.max())
+    gray = np.maximum(gray - thresh, 0)
+    gray = gray / max(1, gray.max())
+    gray = gray * 255
 
-    return image_uint8
+    gray = gray.astype(int)
+    #print(gray)
+
+    from matplotlib.cm import get_cmap
+    cmap = get_cmap(cmap)
+
+    output = np.zeros(gray.shape + (3, ), dtype=np.float64)
+
+    for c in np.unique(gray):
+        output[(gray == c).nonzero()] = cmap(c)[:3]
+
+    return l2f(output)

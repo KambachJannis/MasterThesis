@@ -33,7 +33,7 @@ class LCFCN(torch.nn.Module):
         self.opt.load_state_dict(state_dict["opt"])
     
     def trainOnLoader(self, model, train_loader):
-        # ???
+        # Declare Train Mode
         model.train()
 
         # Prepare Variables
@@ -68,8 +68,13 @@ class LCFCN(torch.nn.Module):
         
         # Forward Prop
         logits = self.model_base.forward(images)
+        probs = logits.sigmoid()
         # Calculate Loss
-        loss = lcfcn_loss.computeLoss(points = points, probs = logits.sigmoid())
+        overall_loss = 0.
+        for i in range(len(probs)):
+            loss = lcfcn_loss.computeLoss(points = points[i], probs = probs[i])
+            overall_loss += loss
+        loss = overall_loss / len(probs)
         # Backprop
         loss.backward()
         # Optimize
@@ -108,7 +113,7 @@ class LCFCN(torch.nn.Module):
         return val_dict
 
     def valOnBatch(self, batch):
-        #???
+        # Declare Eval Mode
         self.eval()
 
         # Load Data to GPU
@@ -117,7 +122,7 @@ class LCFCN(torch.nn.Module):
         
         # Forward Prop
         logits = self.model_base.forward(images)
-        # ??
+        # Sigmoid Function
         probs = logits.sigmoid().cpu().numpy()
         blobs = lcfcn_loss.getBlobs(probs=probs)
         miscounts = abs(float((np.unique(blobs) !=0 ).sum() - (points != 0).sum()))
@@ -126,44 +131,47 @@ class LCFCN(torch.nn.Module):
         
     @torch.no_grad()
     def visOnBatch(self, batch, savedir_image):
+        # Declare Eval Mode
         self.eval()
+        
+        ############ Preprocess ########################
+        # Get Image for Prediction
         images = batch["images"].cuda()
-        #points = batch["points"].long().cuda() unused var
+        # Get Probs for Image
         logits = self.model_base.forward(images)
         probs = logits.sigmoid().cpu().numpy()
-
-        blobs = lcfcn_loss.getBlobs(probs=probs)
-
-        #pred_counts = (np.unique(blobs)!=0).sum() unused var
-        pred_blobs = blobs
+        # Unique Labels for each blob
+        blobs = lcfcn_loss.getBlobs(probs = probs)
+        # Remove single Dimensions
+        pred_blobs = blobs.squeeze()
         pred_probs = probs.squeeze()
+        # Get Denormalized Image to Display
+        img_src = haven_viz.get_image(batch["images"], denorm="rgb")
 
-        # loc 
-        #pred_count = pred_counts.ravel()[0] #unused var
-        pred_blobs = pred_blobs.squeeze()
+        ################ GROUND TRUTH POINTS ######################
+        points = batch["points"][0].long().numpy().squeeze()
+        n_points = batch["points"].sum().item()
+        y_list, x_list = np.where(points)
+        text = f"{n_points}"
         
-        img_org = haven_viz.get_image(batch["images"],denorm="rgb")
+        img_labels = haven_viz.points_on_image(y_list, x_list, img_src)
+        haven_viz.text_on_image(text=text, image=img_labels)
 
-        # true points
-        y_list, x_list = np.where(batch["points"][0].long().numpy().squeeze())
-        img_peaks = haven_viz.points_on_image(y_list, x_list, img_org)
-        text = "%s ground truth" % (batch["points"].sum().item())
-        haven_viz.text_on_image(text=text, image=img_peaks)
-
-        # pred points 
+        ################### BLOBS ################################
         pred_points = lcfcn_loss.blobsToPoints(pred_blobs).squeeze()
         y_list, x_list = np.where(pred_points.squeeze())
-        img_pred = haven_viz.mask_on_image(img_org, pred_blobs)
-        # img_pred = haven_img.points_on_image(y_list, x_list, img_org)
-        text = "%s predicted" % (len(y_list))
+        text = f"{len(y_list)}"
+        
+        img_pred = haven_viz.mask_on_image(img_src, pred_blobs)
+        # img_pred = haven_img.points_on_image(y_list, x_list, img_org) in case I want points inside the blobs
+        
         haven_viz.text_on_image(text=text, image=img_pred)
 
-        # heatmap 
+        #################### HEATMAP #############################
         heatmap = haven_viz.gray2cmap(pred_probs)
         heatmap = haven_viz.f2l(heatmap)
-        haven_viz.text_on_image(text="lcfcn heatmap", image=heatmap)
+        #haven_viz.text_on_image(text="lcfcn heatmap", image=heatmap)
     
-        img_mask = np.hstack([img_peaks, img_pred, heatmap])
-        
-        haven_viz.save_image(savedir_image, img_mask)
-     
+        ################# Stitch and Save #########################
+        stitched_image = np.hstack([img_labels, img_pred, heatmap])
+        haven_viz.save_image(savedir_image, stitched_image)
