@@ -16,7 +16,7 @@ from helpers.cob.dataset import PASCALDataSet
 cfg = {
     'images': "/home/jovyan/work/ma/helpers/cob/pascal-voc/VOC2012",
     'segments': "/home/jovyan/work/ma/helpers/cob/trainval",
-    'run': "/home/jovyan/work/ma/helpers/cob/runs/cob",
+    'run': "/home/jovyan/work/runs/cob",
     'lr': 1e-4,
     'decay': 2e-4,
     'momentum': 0.9,
