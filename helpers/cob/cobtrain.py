@@ -1,92 +1,107 @@
 import os
-import tqdm
 import numpy as np
+from tqdm import tqdm
 from fnmatch import fnmatch
 from collections import defaultdict
 
 import torch
 from torch import nn
 import torch.optim as optim
+import torch.nn.functional as F
 from torch.utils.data import DataLoader
 
 from models.base import cobnet
 from helpers.cob.dataset import PASCALDataSet
+
+cfg = {
+    'images': "/home/jovyan/work/ma/helpers/cob/pascal-voc/VOC2012",
+    'segments': "/home/jovyan/work/ma/helpers/cob/trainval",
+    'run': "/home/jovyan/work/ma/helpers/cob/runs/cob",
+    'lr': 1e-4,
+    'decay': 2e-4,
+    'momentum': 0.9,
+    'epochs-div-lr': 6,
+    'epochs': 10,
+    'aug-n-angles': 4,
+}
         
 def initRetrain(cfg):
-        if (not os.path.exists(cfg.run)):
-            os.makedirs(cfg.run)
+    ''' Call this Method with the Settings above to retrain the COBNet '''
+    
+    if (not os.path.exists(cfg['run'])):
+        os.makedirs(cfg['run'])
 
-        # init model
-        model = cobnet.CobNet()
-        device = torch.device('cuda')
-        model.to(device)
-        model_params = parseModelParams(model)
+    # init model
+    model = cobnet.CobNet()
+    device = torch.device('cuda')
+    model.to(device)
+    model_params = parseModelParams(model)
 
-        # init PASCAL data loader
-        train_set = PASCALDataSet(imgs = cfg.images, segs = cfg.segments, split = 'train')
-        train_loader_fs = DataLoader(train_set, collate_fn = train_set.collate_fn, batch_size = 16, drop_last = True, shuffle = True)
-        train_loader_or = DataLoader(train_set, collate_fn = train_set.collate_fn, batch_size = 4, drop_last = True, shuffle = True)
+    # init PASCAL data loader
+    train_set = PASCALDataSet(imgs = cfg['images'], segs = cfg['segments'], split = 'train')
+    train_loader_fs = DataLoader(train_set, collate_fn = train_set.collate_fn, batch_size = 16, drop_last = True, shuffle = True)
+    train_loader_or = DataLoader(train_set, collate_fn = train_set.collate_fn, batch_size = 4, drop_last = True, shuffle = True)
 
-        val_set = PASCALDataSet(imgs = cfg.images, segs = cfg.segments, split = 'val')
-        val_loader = DataLoader(val_set, collate_fn = val_set.collate_fn, batch_size = 32)
-        prev_loader = DataLoader(val_set, collate_fn = val_set.collate_fn, batch_size = 10)
+    val_set = PASCALDataSet(imgs = cfg['images'], segs = cfg['segments'], split = 'val')
+    val_loader = DataLoader(val_set, collate_fn = val_set.collate_fn, batch_size = 32)
+    prev_loader = DataLoader(val_set, collate_fn = val_set.collate_fn, batch_size = 10)
 
-        dataloaders = {
-            'train_fs': train_loader_fs,
-            'train_or': train_loader_or,
-            'prev': prev_loader,
-            'val': val_loader
-        }
+    dataloaders = {
+        'train_fs': train_loader_fs,
+        'train_or': train_loader_or,
+        'prev': prev_loader,
+        'val': val_loader
+    }
 
-        optimizers = {'base': optim.SGD([{'params': model_params['base0-3.weight'],'lr': cfg.lr},
-                                 {'params': model_params['base0-3.bias'], 'weight_decay': 0, 'lr': cfg.lr * 2},
-                                 {'params': model_params['base4.weight'], 'lr': cfg.lr * 100},
-                                 {'params': model_params['base4.bias'], 'weight_decay': 0, 'lr': cfg.lr * 200},],
-                                lr=cfg.lr, weight_decay=cfg.decay, momentum=cfg.momentum),
-              'reduc': optim.SGD([{'params': model_params['reducers.weight'], 'lr': cfg.lr * 100,}, 
-                                  {'params': model_params['reducers.bias'], 'lr': cfg.lr * 200, 'weight_decay': 0,}],
-                                 weight_decay=cfg.decay, momentum=cfg.momentum),
-              'fuse': optim.SGD([{'params': model_params['fuse.weight'], 'lr': cfg.lr * 100,}, 
-                                 {'params': model_params['fuse.bias'], 'lr': cfg.lr * 200, 'weight_decay': 0,}],
-                                weight_decay=cfg.decay, momentum=cfg.momentum),
-              'orientation': optim.SGD([{'params': model_params['orientation.weight'], 'lr': cfg.lr}, 
-                                        {'params': model_params['orientation.bias'], 'lr': cfg.lr * 2, 'weight_decay': 0,}],
-                                       weight_decay=cfg.decay, momentum=cfg.momentum),
-        }
+    optimizers = {'base': optim.SGD([{'params': model_params['base0-3.weight'],'lr': cfg['lr']},
+                             {'params': model_params['base0-3.bias'], 'weight_decay': 0, 'lr': cfg['lr'] * 2},
+                             {'params': model_params['base4.weight'], 'lr': cfg['lr'] * 100},
+                             {'params': model_params['base4.bias'], 'weight_decay': 0, 'lr': cfg['lr'] * 200},],
+                            lr=cfg['lr'], weight_decay=cfg['decay'], momentum=cfg['momentum']),
+          'reduc': optim.SGD([{'params': model_params['reducers.weight'], 'lr': cfg['lr'] * 100,}, 
+                              {'params': model_params['reducers.bias'], 'lr': cfg['lr'] * 200, 'weight_decay': 0,}],
+                             weight_decay=cfg['decay'], momentum=cfg['momentum']),
+          'fuse': optim.SGD([{'params': model_params['fuse.weight'], 'lr': cfg['lr'] * 100,}, 
+                             {'params': model_params['fuse.bias'], 'lr': cfg['lr'] * 200, 'weight_decay': 0,}],
+                            weight_decay=cfg['decay'], momentum=cfg['momentum']),
+          'orientation': optim.SGD([{'params': model_params['orientation.weight'], 'lr': cfg['lr']}, 
+                                    {'params': model_params['orientation.bias'], 'lr': cfg['lr'] * 2, 'weight_decay': 0,}],
+                                   weight_decay=cfg['decay'], momentum=cfg['momentum']),
+    }
 
-        lr_scheduler = {'base': optim.lr_scheduler.MultiStepLR(optimizers['base'], milestones=[cfg.epochs_div_lr], gamma=0.1),
-                        'reduc': optim.lr_scheduler.MultiStepLR(optimizers['reduc'], milestones=[cfg.epochs_div_lr], gamma=0.1),
-                        'fuse': optim.lr_scheduler.MultiStepLR(optimizers['fuse'], milestones=[cfg.epochs_div_lr], gamma=0.1)
-        }
+    lr_scheduler = {'base': optim.lr_scheduler.MultiStepLR(optimizers['base'], milestones=[cfg['epochs-div-lr']], gamma=0.1),
+                    'reduc': optim.lr_scheduler.MultiStepLR(optimizers['reduc'], milestones=[cfg['epochs-div-lr']], gamma=0.1),
+                    'fuse': optim.lr_scheduler.MultiStepLR(optimizers['fuse'], milestones=[cfg['epochs-div-lr']], gamma=0.1)
+    }
 
-        if (os.path.exists(os.path.join(cfg.run, 'checkpoints', 'cp_fs.pth.tar'))):
-            print('found model, will skip fusion mode')
-            start_epoch = 8
+    if (os.path.exists(os.path.join(cfg['run'], 'checkpoints', 'cp_fs.pth.tar'))):
+        print('found model, will skip fusion mode')
+        start_epoch = 8
+        mode = 'or'
+    else:
+        print('creating new model')
+        start_epoch = 0
+        mode = 'fs'
+
+    for epoch in range(start_epoch, cfg['epochs']):
+        if (epoch > 7):
             mode = 'or'
-        else:
-            print('creating new model')
-            start_epoch = 0
-            mode = 'fs'
 
-        for epoch in range(start_epoch, cfg.epochs):
-            if (epoch > 7):
-                mode = 'or'
+        print('epoch {}/{}, mode: {}, lr: {:.2e}'.format(epoch + 1, 10, mode, lr_scheduler['base'].get_last_lr()[0]))
 
-            print('epoch {}/{}, mode: {}, lr: {:.2e}'.format(epoch + 1, 10, mode, lr_scheduler['base'].get_last_lr()[0]))
+        model.train()
+        model.base_model.apply(freeze)
 
-            model.train()
-            model.base_model.apply(freeze)
+        losses = trainOneEpoch(model, dataloaders, optimizers, mode, epoch)
 
-            losses = trainOneEpoch(model, dataloaders, optimizers, mode, epoch)
+        for k in lr_scheduler.keys():
+            lr_scheduler[k].step()
 
-            for k in lr_scheduler.keys():
-                lr_scheduler[k].step()
+        # save checkpoint
+        save_path = os.path.join(cfg['run'], 'checkpoints', 'cp_{}.pth.tar'.format(mode))
+        state_dict = model.state_dict()
+        torch.save(state_dict, save_path)
 
-            # save checkpoint
-            save_path = os.path.join(cfg.run, 'checkpoints', 'cp_{}.pth.tar'.format(mode))
-            state_dict = model.state_dict()
-            torch.save(state_dict, save_path)
-            
             
 def trainOneEpoch(model, dataloaders, optimizers, mode, epoch):
 
@@ -101,7 +116,7 @@ def trainOneEpoch(model, dataloaders, optimizers, mode, epoch):
     pbar = tqdm(total=len(dataloader))
     for i, data in enumerate(dataloader):
         
-        data = batchToDevice(data, device)
+        data = batchToDevice(data, 'cuda')
         loss = 0
         
         with torch.set_grad_enabled(True):
