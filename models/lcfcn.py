@@ -70,11 +70,9 @@ class LCFCN(torch.nn.Module):
         logits = self.model_base.forward(images)
         probs = logits.sigmoid()
         # Calculate Loss
-        overall_loss = 0.
+        loss = 0.
         for i in range(len(probs)):
-            loss = lcfcn_loss.computeLoss(points = points[i], probs = probs[i])
-            overall_loss += loss
-        loss = overall_loss / len(probs)
+            loss += lcfcn_loss.computeLoss(points = points[i], probs = probs[i])
         # Backprop
         loss.backward()
         # Optimize
