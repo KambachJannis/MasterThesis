@@ -70,7 +70,7 @@ class COB(torch.nn.Module):
         logits = self.model_base.forward(images)
         probs = logits.sigmoid()
         # Calculate Loss
-        loss = lcfcn_loss.computeLoss(points = points, probs = probs, cob = cob)
+        loss = cob_loss.computeLoss(points = points, probs = probs, cob = cob)
         # Backprop
         loss.backward()
         # Optimize
@@ -120,7 +120,7 @@ class COB(torch.nn.Module):
         logits = self.model_base.forward(images)
         # Sigmoid Function
         probs = logits.sigmoid().cpu().numpy()
-        blobs = lcfcn_loss.getBlobs(probs=probs)
+        blobs = cob_loss.getBlobs(probs=probs)
         miscounts = abs(float((np.unique(blobs) !=0 ).sum() - (points != 0).sum()))
 
         return {'miscounts': miscounts}
@@ -137,7 +137,7 @@ class COB(torch.nn.Module):
         logits = self.model_base.forward(images)
         probs = logits.sigmoid().cpu().numpy()
         # Unique Labels for each blob
-        blobs = lcfcn_loss.getBlobs(probs = probs)
+        blobs = cob_loss.getBlobs(probs = probs)
         # Remove single Dimensions
         pred_blobs = blobs.squeeze()
         pred_probs = probs.squeeze()
@@ -154,7 +154,7 @@ class COB(torch.nn.Module):
         haven_viz.text_on_image(text=text, image=img_labels)
 
         ################### BLOBS ################################
-        pred_points = lcfcn_loss.blobsToPoints(pred_blobs).squeeze()
+        pred_points = cob_loss.blobsToPoints(pred_blobs).squeeze()
         y_list, x_list = np.where(pred_points.squeeze())
         text = f"{len(y_list)}"
         

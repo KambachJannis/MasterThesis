@@ -53,7 +53,8 @@ class Denmark(data.Dataset):
                 
         cob_path = os.path.join(self.cob_path, name + ".jpg")
         if os.path.isfile(points_path):
-            cob = imread(cob_path)
+            cob = imread(cob_path)[:, :, 1].astype('float64')
+            cob /= 255.0
         else:
             cob = None
         
@@ -63,7 +64,7 @@ class Denmark(data.Dataset):
             
         return {"images":image, 
                 "points":points.squeeze(), 
-                "cob": cob
+                "cob": cob,
                 "counts":counts, 
                 'meta':{"index":index,
                         "path":os.path.join(self.img_path, name + ".jpg")}}

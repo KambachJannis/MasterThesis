@@ -29,8 +29,11 @@ def computeLoss(points, probs, cob, roi_mask=None):
     for item in checklist:
         # get relevant pixels for this item
         item_ids = probs_flat[item['id_list']]
-        # init tensor of same size and fill with label value
-        item_label = torch.ones(item_ids.shape, device = item_ids.device) * item['label']
+        if item['label'] is not None:
+            # init tensor of same size and fill with label value
+            item_label = torch.ones(item_ids.shape, device = item_ids.device) * item['label']
+        else:
+            item_label = item['labels'].float()
         # essentially log function
         loss += item['scale'] * F.binary_cross_entropy(item_ids, item_label, reduction='mean')
     
@@ -134,6 +137,18 @@ def getPixelChecklist(points, probs, cob, roi_mask = None, batch = 0):
             
     ################ CONVOLUTIONAL ORIENTED BOUNDARIES ######################
     
+    for blob in foreground_blobs:
+        # not background
+        if blob == 0:
+            continue
+        # bool matrix with False where other blobs and background are, True for blob
+        blob_mask = blobs==blob
+        # pixel ids where blob is predicted
+        ids_blob = np.where(blob_mask.ravel())[0]
+        # apply mask to cob
+        cob_preds = cob[blob_mask]
+        checklist += [{'scale': 1, 'id_list': ids_blob, 'label': None, 'labels': cob_preds, 'batch': batch}]  #boundaries = background = 0
+
 
     return checklist
 
