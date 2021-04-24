@@ -30,6 +30,7 @@ class Denmark(data.Dataset):
         self.img_names = [name.replace(".jpg\n","").replace(".jpg","") for name in utils.readText(fname)]
         self.img_path = os.path.join(datadir, 'images')
         self.points_path = os.path.join(datadir, 'points')
+        self.cob_path = os.path.join(datadir, 'cob')
 
     def __len__(self):
         return len(self.img_names)
@@ -49,6 +50,12 @@ class Denmark(data.Dataset):
             for point in points_src:
                 w, h = point[0], point[1]
                 points[h-1][w-1] = [1]
+                
+        cob_path = os.path.join(self.cob_path, name + ".jpg")
+        if os.path.isfile(points_path):
+            cob = imread(cob_path)
+        else:
+            cob = None
         
         counts = torch.LongTensor(np.array([int(points.sum())]))   
        
@@ -56,6 +63,7 @@ class Denmark(data.Dataset):
             
         return {"images":image, 
                 "points":points.squeeze(), 
+                "cob": cob
                 "counts":counts, 
                 'meta':{"index":index,
                         "path":os.path.join(self.img_path, name + ".jpg")}}

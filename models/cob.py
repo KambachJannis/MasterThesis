@@ -5,9 +5,9 @@ import numpy as np
 from models import base
 from helpers import metrics
 from helpers import haven_viz
-from models.losses import lcfcn_loss
+from models.losses import cob_loss
 
-class LCFCN(torch.nn.Module):
+class COB(torch.nn.Module):
     def __init__(self, exp_dict, train_set):
         super().__init__()
         self.exp_dict = exp_dict
@@ -65,11 +65,12 @@ class LCFCN(torch.nn.Module):
         # Load Data to GPU
         images = batch["images"].cuda()
         points = batch["points"].long().cuda()
+        cob = batch['cob'].cuda()
         # Forward Prop
         logits = self.model_base.forward(images)
         probs = logits.sigmoid()
         # Calculate Loss
-        loss = lcfcn_loss.computeLoss(points = points, probs = probs)
+        loss = lcfcn_loss.computeLoss(points = points, probs = probs, cob = cob)
         # Backprop
         loss.backward()
         # Optimize

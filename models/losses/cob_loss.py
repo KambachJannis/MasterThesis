@@ -7,7 +7,7 @@ from skimage.measure import regionprops as ski_regions
 from skimage.segmentation import watershed as ski_watershed
 from skimage.segmentation import find_boundaries as ski_boundaries
 
-def computeLoss(points, probs, roi_mask=None):
+def computeLoss(points, probs, cob, roi_mask=None):
     """
     points: n x c x h x w
     probs: h x w (0 or 1)
@@ -18,12 +18,13 @@ def computeLoss(points, probs, roi_mask=None):
     points_red = points.squeeze()
     assert(points_red.max() <= 1)
     probs_red = probs.squeeze()
+    cob_red = cob.squeeze()
     # unfold A x B tensor to A*B x 1 tensor
     probs_flat = probs_red.view(-1)
     
     # get list of all relevant pixels and their GT labels
     #checklist = handleBatches(points, probs, roi_mask)
-    checklist = getPixelChecklist(points_red, probs_red, roi_mask)
+    checklist = getPixelChecklist(points_red, probs_red, cob_red, roi_mask)
     
     for item in checklist:
         # get relevant pixels for this item
@@ -52,7 +53,7 @@ def handleBatches(points_batch, probs_batch, roi_mask = None):
 
 
 @torch.no_grad()
-def getPixelChecklist(points, probs, roi_mask = None, batch = 0):
+def getPixelChecklist(points, probs, cob, roi_mask = None, batch = 0):
     """
     For each loss function part, builds a list of relevant pixels and their GT labels.
     
@@ -129,7 +130,10 @@ def getPixelChecklist(points, probs, roi_mask = None, batch = 0):
         else:
             # get ids of all the background pixels in RoI
             ids_background = np.where(blob_mask.ravel())[0]
-            checklist += [{'scale': 1.1, 'id_list': ids_background, 'label': 0, 'batch': batch}]  
+            checklist += [{'scale': 1.1, 'id_list': ids_background, 'label': 0, 'batch': batch}]
+            
+    ################ CONVOLUTIONAL ORIENTED BOUNDARIES ######################
+    
 
     return checklist
 
