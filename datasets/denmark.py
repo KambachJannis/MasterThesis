@@ -13,9 +13,9 @@ from helpers import transformers
 import os
 
 class Denmark(data.Dataset):
-    def __init__(self, split, datadir, exp_dict):
+    def __init__(self, split, datadir, transform):
         self.split = split
-        self.exp_dict = exp_dict
+        self.transform = transform
         self.n_classes = 1
         
         if split == "train":
@@ -65,7 +65,7 @@ class Denmark(data.Dataset):
         
         counts = torch.LongTensor(np.array([int(points.sum())]))   
        
-        image, points = transformers.applyTransform(self.split, image, points, transform_name = self.exp_dict['dataset']['transform'])
+        image, points = transformers.applyTransform(self.split, image, points, transform_name = self.transform)
             
         return {"images": image, 
                 "points": points.squeeze(),

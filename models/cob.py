@@ -8,21 +8,21 @@ from helpers import haven_viz
 from models.losses import cob_loss
 
 class COB(torch.nn.Module):
-    def __init__(self, exp_dict, train_set):
+    def __init__(self, exp_dict, n_classes):
         super().__init__()
         self.exp_dict = exp_dict
-        self.n_classes = train_set.n_classes
-        self.exp_dict = exp_dict
+        self.n_classes = n_classes
 
         self.model_base = base.getBase(self.exp_dict['model']['base'], self.exp_dict, n_classes=self.n_classes)
 
-        if self.exp_dict["optimizer"] == "adam":
-            self.opt = torch.optim.Adam(self.model_base.parameters(), lr = self.exp_dict["lr"], betas = (0.99, 0.999), weight_decay = 0.0005)
-        elif self.exp_dict["optimizer"] == "sgd":
-            self.opt = torch.optim.SGD(self.model_base.parameters(), lr = self.exp_dict["lr"])
-        else:
-            name = self.exp_dict["optimizer"]
-            raise ValueError(f"Optimizer {name} not integrated.")
+        if 'train' in exp_dict["dataset_size"]:
+            if self.exp_dict["optimizer"] == "adam":
+                self.opt = torch.optim.Adam(self.model_base.parameters(), lr = self.exp_dict["lr"], betas = (0.99, 0.999), weight_decay = 0.0005)
+            elif self.exp_dict["optimizer"] == "sgd":
+                self.opt = torch.optim.SGD(self.model_base.parameters(), lr = self.exp_dict["lr"])
+            else:
+                name = self.exp_dict["optimizer"]
+                raise ValueError(f"Optimizer {name} not integrated.")
 
     def getStateDict(self):
         state_dict = {"model": self.model_base.state_dict(), "opt":self.opt.state_dict()}
