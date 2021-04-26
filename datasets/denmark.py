@@ -30,6 +30,7 @@ class Denmark(data.Dataset):
         self.img_names = [name.replace(".jpg\n","").replace(".jpg","") for name in utils.readText(fname)]
         self.img_path = os.path.join(datadir, 'images')
         self.points_path = os.path.join(datadir, 'points')
+        self.points_path = os.path.join(datadir, 'shapes')
         self.cob_path = os.path.join(datadir, 'cob')
 
     def __len__(self):
@@ -51,6 +52,10 @@ class Denmark(data.Dataset):
                 w, h = point[0], point[1]
                 points[h-1][w-1] = [1]
                 
+        shapes_path = os.path.join(self.shapes_path, name + "_points.npy")
+        if os.path.isfile(shapes_path): 
+            shapes = np.load(shapes_path)
+                
         cob_path = os.path.join(self.cob_path, name + ".jpg")
         if os.path.isfile(points_path):
             cob = imread(cob_path)[:, :, 1].astype('float64')
@@ -62,8 +67,9 @@ class Denmark(data.Dataset):
        
         image, points = transformers.applyTransform(self.split, image, points, transform_name = self.exp_dict['dataset']['transform'])
             
-        return {"images":image, 
-                "points":points.squeeze(), 
+        return {"images": image, 
+                "points": points.squeeze(),
+                "shapes": shapes,
                 "cob": cob,
                 "counts":counts, 
                 'meta':{"index":index,
