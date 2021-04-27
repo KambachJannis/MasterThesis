@@ -245,20 +245,35 @@ class COB(torch.nn.Module):
             shape_numpy = np.array(img)
             shape_mask = shape_numpy == 1
             
-            # select points within mask and identify corresponding blob
-            point_mask = points_numpy * shape_mask
-            blob_id = np.unique(blobs * point_mask)
-            blob_id = blob_id[blob_id != 0] # not background
-
+            # find out ids of blobs that intersect with shape
+            blob_ids = np.unique(blobs * shape_mask)
+            blob_ids = blob_ids[blob_ids != 0] # not background
+            
             # compute mIoU with logical numpy ops
-            if len(blob_id) == 0:
+            if len(blob_ids) == 0:
                 running_iou += 0
-            elif len(blob_id) == 1:
-                blob_mask = blobs == blob_id[0]
-                union = np.logical_or(blob_mask, shape_mask).sum()
-                intersection = np.logical_and(blob_mask, shape_mask).sum()
-                running_iou += intersection / union
             else:
-                raise ValueError("did NOT think a shape would contain more than two points")
-
+                # collect bool masks of all blobs
+                blob_masks = []
+                for blob in blob_ids:
+                    blob_mask = blobs == blob
+                    intersection = np.logical_and(blob_mask, shape_mask).sum()
+                    if intersection > (0.5 * blob_mask.sum()): 
+                        blob_masks.append(blob_mask)
+                
+                # all blobs might be eliminated, 1 and more need to be treated seperately
+                if len(blob_masks) == 0:
+                    running_iou += 0
+                elif len(blob_masks) == 1:
+                    blob_union = blob_masks[0]
+                    union = np.logical_or(blob_union, shape_mask).sum()
+                    intersection = np.logical_and(blob_union, shape_mask).sum()
+                    running_iou += intersection / union
+                else:
+                    # combine into single blob mask
+                    blob_union = np.logical_or.reduce(blob_masks)
+                    union = np.logical_or(blob_union, shape_mask).sum()
+                    intersection = np.logical_and(blob_union, shape_mask).sum()
+                    running_iou += intersection / union
+                
         return {'mIoU': running_iou / len(shapes)}

@@ -180,7 +180,7 @@ def points_on_image(y_list, x_list, image, radius=3, c_list=None):
         if c_list is not None:
             color = color_list[c_list[i]] 
         else:
-            color = color_list[2] 
+            color = color_list[0] 
         
         # Line thickness of 2 px 
         thickness = 2
