@@ -64,7 +64,7 @@ class COB(torch.nn.Module):
         # Load Data to GPU
         images = batch["images"].cuda()
         points = batch["points"].long().cuda()
-        cob = batch['cob'].cuda()
+        cob = batch["objectness"]["cob"].cuda()
         # Forward Prop
         logits = self.model_base.forward(images)
         probs = logits.sigmoid()
@@ -170,3 +170,52 @@ class COB(torch.nn.Module):
         ################# Stitch and Save #########################
         stitched_image = np.hstack([img_labels, img_pred, heatmap])
         haven_viz.save_image(savedir_image, stitched_image)
+        
+    @torch.no_grad()
+    def testOnLoader(self, test_loader, savedir_images = None, n_images = 2):
+        # Declare Eval Mode
+        self.eval()
+        
+        # Prepare Variables
+        n_batches = len(test_loader)
+        test_meter = metrics.Meter()
+        pbar = tqdm.tqdm(total=n_batches)
+        
+        # MAIN LOOP
+        for i, batch in enumerate(test_loader):
+            # Validate on Batch
+            score_dict = self.testOnBatch(batch)
+            # Save Score
+            test_meter.add(score_dict['mIoU'], batch['images'].shape[0])
+            # Update PBar
+            pbar.set_description("Testing. mIoU: %.4f" % test_meter.get_avg_score())
+            pbar.update(1)
+            # Export Demo Images
+            if savedir_images and i < n_images:
+                os.makedirs(savedir_images, exist_ok = True)
+                self.visOnBatch(batch, savedir_image=os.path.join(savedir_images, "%d.jpg" % i))
+                
+        pbar.close()
+        test_mIoU = val_meter.get_avg_score()
+        test_dict = {'test_mIoU': test_mIoU}
+        
+        return test_dict
+
+    def testOnBatch(self, batch):
+        # Declare Eval Mode
+        self.eval()
+
+        # Load Data to GPU
+        images = batch["images"].cuda()
+        points = batch["points"].long().cuda()
+        shapes = batch["shapes"].long().cuda()
+        
+        # Forward Prop
+        logits = self.model_base.forward(images)
+        # Sigmoid Function
+        probs = logits.sigmoid().cpu().numpy()
+        blobs = cob_loss.getBlobs(probs=probs)
+        
+        miscounts = abs(float((np.unique(blobs) !=0 ).sum() - (points != 0).sum()))
+
+        return {'mIoU': miscounts}

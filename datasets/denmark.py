@@ -30,7 +30,7 @@ class Denmark(data.Dataset):
         self.img_names = [name.replace(".jpg\n","").replace(".jpg","") for name in utils.readText(fname)]
         self.img_path = os.path.join(datadir, 'images')
         self.points_path = os.path.join(datadir, 'points')
-        self.points_path = os.path.join(datadir, 'shapes')
+        self.shapes_path = os.path.join(datadir, 'shapes')
         self.cob_path = os.path.join(datadir, 'cob')
 
     def __len__(self):
@@ -38,9 +38,10 @@ class Denmark(data.Dataset):
 
     def __getitem__(self, index):
         name = self.img_names[index]
+        path = os.path.join(self.img_path, name + ".jpg")
         
         # LOAD IMG, POINT
-        image = imread(os.path.join(self.img_path, name + ".jpg"))
+        image = imread(path)
         #image = np.load(os.path.join(self.img_path, name + ".npy"))
         nrows, ncols = len(image), len(image[0]) 
         
@@ -52,9 +53,11 @@ class Denmark(data.Dataset):
                 w, h = point[0], point[1]
                 points[h-1][w-1] = [1]
                 
-        shapes_path = os.path.join(self.shapes_path, name + "_points.npy")
+        shapes_path = os.path.join(self.shapes_path, name + "_shapes.npy")
         if os.path.isfile(shapes_path): 
-            shapes = np.load(shapes_path)
+            shapes = list(np.load(shapes_path, allow_pickle = True))
+        else:
+            shapes = []
                 
         cob_path = os.path.join(self.cob_path, name + ".jpg")
         if os.path.isfile(points_path):
@@ -70,7 +73,7 @@ class Denmark(data.Dataset):
         return {"images": image, 
                 "points": points.squeeze(),
                 "shapes": shapes,
-                "cob": cob,
-                "counts":counts, 
-                'meta':{"index":index,
-                        "path":os.path.join(self.img_path, name + ".jpg")}}
+                "objectness": {"cob": cob},
+                "counts": counts, 
+                "meta": {"index": index,
+                         "path": path}}
