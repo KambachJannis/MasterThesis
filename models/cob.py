@@ -5,6 +5,7 @@ import numpy as np
 from models import base
 from helpers import metrics
 from helpers import haven_viz
+from PIL import Image, ImageDraw
 from models.losses import cob_loss
 
 class COB(torch.nn.Module):
@@ -125,7 +126,7 @@ class COB(torch.nn.Module):
         return {'miscounts': miscounts}
         
     @torch.no_grad()
-    def visOnBatch(self, batch, savedir_image):
+    def visOnBatch(self, batch, savedir_image, text_in = None):
         # Declare Eval Mode
         self.eval()
         
@@ -147,9 +148,23 @@ class COB(torch.nn.Module):
         points = batch["points"][0].long().numpy().squeeze()
         n_points = batch["points"].sum().item()
         y_list, x_list = np.where(points)
-        text = f"{n_points}"
+        
+        if text_in is not None:
+            text = text_in
+        else:
+            text = f"{n_points}"
         
         img_labels = haven_viz.points_on_image(y_list, x_list, img_src)
+        
+        shapes = batch["shapes"]
+        if len(shapes) > 0:
+            img = Image.new('L', (250, 250), 0)
+            for shape in shapes:
+                flat_list = [item.item() for sublist in shape for item in sublist]
+                ImageDraw.Draw(img).polygon(flat_list, outline=1, fill=1) 
+            
+            img_labels = haven_viz.mask_on_image(img_labels, np.array(img).squeeze())
+        
         haven_viz.text_on_image(text=text, image=img_labels)
 
         ################### BLOBS ################################
@@ -193,10 +208,10 @@ class COB(torch.nn.Module):
             # Export Demo Images
             if savedir_images and i < n_images:
                 os.makedirs(savedir_images, exist_ok = True)
-                self.visOnBatch(batch, savedir_image=os.path.join(savedir_images, "%d.jpg" % i))
+                self.visOnBatch(batch, savedir_image=os.path.join(savedir_images, "%d_test.jpg" % i), text_in = str(score_dict['mIoU']))
                 
         pbar.close()
-        test_mIoU = val_meter.get_avg_score()
+        test_mIoU = test_meter.get_avg_score()
         test_dict = {'test_mIoU': test_mIoU}
         
         return test_dict
@@ -208,7 +223,8 @@ class COB(torch.nn.Module):
         # Load Data to GPU
         images = batch["images"].cuda()
         points = batch["points"].long().cuda()
-        shapes = batch["shapes"].long().cuda()
+        shapes = batch["shapes"]
+        points_numpy = points.cpu().numpy()
         
         # Forward Prop
         logits = self.model_base.forward(images)
@@ -216,6 +232,33 @@ class COB(torch.nn.Module):
         probs = logits.sigmoid().cpu().numpy()
         blobs = cob_loss.getBlobs(probs=probs)
         
-        miscounts = abs(float((np.unique(blobs) !=0 ).sum() - (points != 0).sum()))
+        # iterate over shapes, to ensure that GOOD predictions without label are not penalized
+        running_iou = 0
+        for shape in shapes:
+            # flat list of coordinates [x1, y1, x2, y2, ...]
+            flat_list = [item.item() for sublist in shape for item in sublist]
+            # draw template image
+            img = Image.new('L', (250, 250), 0)
+            # draw filled polygon into template
+            ImageDraw.Draw(img).polygon(flat_list, outline=1, fill=1)
+            # convert to bool-mask
+            shape_numpy = np.array(img)
+            shape_mask = shape_numpy == 1
+            
+            # select points within mask and identify corresponding blob
+            point_mask = points_numpy * shape_mask
+            blob_id = np.unique(blobs * point_mask)
+            blob_id = blob_id[blob_id != 0] # not background
 
-        return {'mIoU': miscounts}
+            # compute mIoU with logical numpy ops
+            if len(blob_id) == 0:
+                running_iou += 0
+            elif len(blob_id) == 1:
+                blob_mask = blobs == blob_id[0]
+                union = np.logical_or(blob_mask, shape_mask).sum()
+                intersection = np.logical_and(blob_mask, shape_mask).sum()
+                running_iou += intersection / union
+            else:
+                raise ValueError("did NOT think a shape would contain more than two points")
+
+        return {'mIoU': running_iou / len(shapes)}
