@@ -60,20 +60,25 @@ class Denmark(data.Dataset):
             shapes = []
                 
         cob_path = os.path.join(self.cob_path, name + ".jpg")
-        if os.path.isfile(points_path):
+        if os.path.isfile(cob_path):
             cob = imread(cob_path)[:, :, 1].astype('float64')
             cob /= 255.0
+            #cob = 1-cob
         else:
             cob = None
         
         counts = torch.LongTensor(np.array([int(points.sum())]))   
        
         image, points = transformers.applyTransform(self.split, image, points, transform_name = self.transform)
-            
-        return {"images": image, 
+        
+        item = {"images": image, 
                 "points": points.squeeze(),
                 "shapes": shapes,
-                "objectness": {"cob": cob},
                 "counts": counts, 
                 "meta": {"index": index,
                          "path": path}}
+        
+        if cob is not None:
+            item['cob'] = cob
+            
+        return item

@@ -6,9 +6,9 @@ from models import base
 from helpers import metrics
 from helpers import haven_viz
 from PIL import Image, ImageDraw
-from models.losses import lcfcn_loss
 
-class LCFCN(torch.nn.Module):
+
+class Supervised(torch.nn.Module):
     def __init__(self, exp_dict, n_classes):
         super().__init__()
         self.exp_dict = exp_dict
@@ -65,11 +65,23 @@ class LCFCN(torch.nn.Module):
         # Load Data to GPU
         images = batch["images"].cuda()
         points = batch["points"].long().cuda()
+        shapes = batch["shapes"]
+        
+        img = Image.new('L', (256, 256), 0)
+        for shape in shapes:
+            flat_list = [item.item() for sublist in shape for item in sublist]
+            ImageDraw.Draw(img).polygon(flat_list, outline=1, fill=1)
+        
+        shape = torch.from_numpy(np.array(img)).long().unsqueeze(0).cuda()
+    
         # Forward Prop
-        logits = self.model_base.forward(images)
-        probs = logits.sigmoid()
+        probs = self.model_base.forward(images)
+        torch.save(shape, 'shape.pt')
+        torch.save(probs, 'probs.pt')
+        #probs = logits.sigmoid()
         # Calculate Loss
-        loss = lcfcn_loss.computeLoss(points = points, probs = probs)
+        criterion = torch.nn.CrossEntropyLoss()
+        loss = criterion(probs, shape)
         # Backprop
         loss.backward()
         # Optimize
@@ -237,7 +249,7 @@ class LCFCN(torch.nn.Module):
             # flat list of coordinates [x1, y1, x2, y2, ...]
             flat_list = [item.item() for sublist in shape for item in sublist]
             # draw template image
-            img = Image.new('L', (250, 250), 0)
+            img = Image.new('L', (256, 256), 0)
             # draw filled polygon into template
             ImageDraw.Draw(img).polygon(flat_list, outline=1, fill=1)
             # convert to bool-mask

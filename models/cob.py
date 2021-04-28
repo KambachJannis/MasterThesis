@@ -14,7 +14,7 @@ class COB(torch.nn.Module):
         self.exp_dict = exp_dict
         self.n_classes = n_classes
 
-        self.model_base = base.getBase(self.exp_dict['model']['base'], self.exp_dict, n_classes=self.n_classes)
+        self.model_base = base.getBase(self.exp_dict['model']['base'], n_classes=self.n_classes)
 
         if self.exp_dict["optimizer"] == "adam":
             self.opt = torch.optim.Adam(self.model_base.parameters(), lr = self.exp_dict["lr"], betas = (0.99, 0.999), weight_decay = 0.0005)
@@ -65,7 +65,7 @@ class COB(torch.nn.Module):
         # Load Data to GPU
         images = batch["images"].cuda()
         points = batch["points"].long().cuda()
-        cob = batch["objectness"]["cob"].cuda()
+        cob = batch["cob"].cuda()
         # Forward Prop
         logits = self.model_base.forward(images)
         probs = logits.sigmoid()

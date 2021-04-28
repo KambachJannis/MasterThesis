@@ -1,3 +1,4 @@
+import os
 import torch
 import numpy as np
 from scipy import ndimage
@@ -146,7 +147,8 @@ def getPixelChecklist(points, probs, cob, roi_mask = None, batch = 0):
         # pixel ids where blob is predicted
         ids_blob = np.where(blob_mask.ravel())[0]
         # apply mask to cob
-        cob_preds = cob[blob_mask]
+        cob_preds = torch.round(cob[blob_mask])
+        
         checklist += [{'scale': 1, 'id_list': ids_blob, 'label': None, 'labels': cob_preds, 'batch': batch}]  #boundaries = background = 0
 
 
