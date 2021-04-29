@@ -6,7 +6,7 @@ from models import base
 from helpers import metrics
 from helpers import haven_viz
 from PIL import Image, ImageDraw
-
+from models.losses import lcfcn_loss
 
 class Supervised(torch.nn.Module):
     def __init__(self, exp_dict, n_classes):
@@ -73,12 +73,13 @@ class Supervised(torch.nn.Module):
             ImageDraw.Draw(img).polygon(flat_list, outline=1, fill=1)
         
         shape = torch.from_numpy(np.array(img)).long().unsqueeze(0).cuda()
+        #torch.save(shape, 'shape.pt')
     
         # Forward Prop
         probs = self.model_base.forward(images)
-        torch.save(shape, 'shape.pt')
-        torch.save(probs, 'probs.pt')
-        #probs = logits.sigmoid()
+        #torch.save(probs, 'probs.pt')
+        probs = probs.sigmoid()
+        #torch.save(probs, 'probs2.pt')
         # Calculate Loss
         criterion = torch.nn.CrossEntropyLoss()
         loss = criterion(probs, shape)
@@ -131,7 +132,7 @@ class Supervised(torch.nn.Module):
         logits = self.model_base.forward(images)
         # Sigmoid Function
         probs = logits.sigmoid().cpu().numpy()
-        blobs = lcfcn_loss.getBlobs(probs=probs)
+        blobs = lcfcn_loss.getBlobs(probs=probs.squeeze()[1])
         miscounts = abs(float((np.unique(blobs) !=0 ).sum() - (points != 0).sum()))
 
         return {'miscounts': miscounts}
@@ -148,10 +149,10 @@ class Supervised(torch.nn.Module):
         logits = self.model_base.forward(images)
         probs = logits.sigmoid().cpu().numpy()
         # Unique Labels for each blob
-        blobs = lcfcn_loss.getBlobs(probs = probs)
+        blobs = lcfcn_loss.getBlobs(probs = probs.squeeze()[1])
         # Remove single Dimensions
         pred_blobs = blobs.squeeze()
-        pred_probs = probs.squeeze()
+        pred_probs = probs.squeeze()[1]
         # Get Denormalized Image to Display
         img_src = haven_viz.get_image(batch["images"], denorm="rgb")
 

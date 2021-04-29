@@ -68,7 +68,7 @@ class Denmark(data.Dataset):
             cob = None
         
         counts = torch.LongTensor(np.array([int(points.sum())]))   
-       
+        # ICH SOLLTE HIER NICHT DIE SHAPES ALS LISTE MITGEBEN.... BAD PRACTICE.... TRANSFORMER AUSEINANDERNEHMEN, SHAPE ALS BILD INTEGRIEREN, LOSS UMSTELLEN
         image, points = transformers.applyTransform(self.split, image, points, transform_name = self.transform)
         
         item = {"images": image, 
@@ -78,7 +78,7 @@ class Denmark(data.Dataset):
                 "meta": {"index": index,
                          "path": path}}
         
-        if cob is not None:
-            item['cob'] = cob
+        #if cob is not None:
+            #item['cob'] = cob
             
         return item
