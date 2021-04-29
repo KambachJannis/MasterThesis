@@ -30,9 +30,10 @@ class Denmark(data.Dataset):
         name = self.images[index]
         
         # load image
-        image_path = os.path.join(self.image_path, name + ".jpg")
+        image_path = os.path.join(self.images_path, name + ".jpg")
         image = imread(image_path)
         n_rows, n_cols = len(image), len(image[0]) 
+        image = self.transform(image)
         
         # load points
         points_path = os.path.join(self.points_path, name + "_points.npy")
@@ -43,7 +44,8 @@ class Denmark(data.Dataset):
             x, y = point[0]-1, point[1]-1
             points[y][x] = [1]
             
-        counts = torch.LongTensor(np.array([int(points.sum())]))   
+        counts = torch.LongTensor(np.array([int(points.sum())]))
+        points = torch.LongTensor(points).squeeze()
                 
         # load shapes
         shapes_path = os.path.join(self.shapes_path, name + "_shapes.npy")
@@ -55,16 +57,12 @@ class Denmark(data.Dataset):
             ImageDraw.Draw(shapes).polygon(flat_list, outline=1, fill=1)
         
         shapes = np.array(shapes)
-            
-        # apply transformation
-        image, points, shapes = transformers.applyTransform(self.split, image, points, shapes, transform_name = self.transform)
-        points = points.squeeze() # wegmachen durch transformation
         
         item = {"images": image, 
                 "points": points,
                 "counts": counts, 
                 "shapes": shapes,
-                "meta": {"index": index, "path": images_path
+                "meta": {"index": index, "path": images_path}
         }
                 
         return item
