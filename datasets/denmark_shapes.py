@@ -21,8 +21,8 @@ class Denmark(data.Dataset):
         self.n_classes = n_classes
         self.images_path = os.path.join(path, 'images')
         self.points_path = os.path.join(path, 'points')
-        
-        
+        self.shapes_path = os.path.join(path, 'shapes')
+    
     def __len__(self):
         return len(self.images)
 
@@ -44,14 +44,26 @@ class Denmark(data.Dataset):
             points[y][x] = [1]
             
         counts = torch.LongTensor(np.array([int(points.sum())]))   
+                
+        # load shapes
+        shapes_path = os.path.join(self.shapes_path, name + "_shapes.npy")
+        shapes_list = list(np.load(shapes_path, allow_pickle = True))
+        shapes = Image.new('L', (n_rows, n_cols), 0)
+            
+        for shape in shapes_list:
+            flat_list = [item.item() for sublist in shape for item in sublist]
+            ImageDraw.Draw(shapes).polygon(flat_list, outline=1, fill=1)
+        
+        shapes = np.array(shapes)
             
         # apply transformation
-        image, points = transformers.applyTransform(self.split, image, points, transform_name = self.transform)
+        image, points, shapes = transformers.applyTransform(self.split, image, points, shapes, transform_name = self.transform)
         points = points.squeeze() # wegmachen durch transformation
         
         item = {"images": image, 
                 "points": points,
                 "counts": counts, 
+                "shapes": shapes,
                 "meta": {"index": index, "path": images_path
         }
                 

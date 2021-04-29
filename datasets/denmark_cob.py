@@ -21,8 +21,8 @@ class Denmark(data.Dataset):
         self.n_classes = n_classes
         self.images_path = os.path.join(path, 'images')
         self.points_path = os.path.join(path, 'points')
-        
-        
+        self.cob_path = os.path.join(path, 'cob')
+    
     def __len__(self):
         return len(self.images)
 
@@ -43,15 +43,21 @@ class Denmark(data.Dataset):
             x, y = point[0]-1, point[1]-1
             points[y][x] = [1]
             
-        counts = torch.LongTensor(np.array([int(points.sum())]))   
+        counts = torch.LongTensor(np.array([int(points.sum())])) 
+        
+        # load cob
+        cob_path = os.path.join(self.cob_path, name + ".jpg")
+        cob = imread(cob_path)[:, :, 1].astype('float64')
+        cob /= 255.0
             
         # apply transformation
-        image, points = transformers.applyTransform(self.split, image, points, transform_name = self.transform)
+        image, points, cob = transformers.applyTransform(self.split, image, points, cob, transform_name = self.transform)
         points = points.squeeze() # wegmachen durch transformation
         
         item = {"images": image, 
                 "points": points,
                 "counts": counts, 
+                "cob": cob,
                 "meta": {"index": index, "path": images_path
         }
                 

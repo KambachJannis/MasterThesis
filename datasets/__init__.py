@@ -1,19 +1,13 @@
-from datasets import trancos
-from datasets import denmark
+from datasets import denmark, denmark_cob, denmark_shapes
 
-def getDataset(dataset, split, datadir, transform, dataset_size = None):
-    name = dataset
+def getDataset(name, path, images, n_classes, transform):
     
-    if name == 'trancos':
-        dataset = trancos.Trancos(split, datadir, transform)
-        if dataset_size is not None and dataset_size[split] != 'all':
-            dataset.img_names = dataset.img_names[:dataset_size[split]]
-    
-    elif name == 'denmark':
-        dataset = denmark.Denmark(split, datadir, transform)
-        if dataset_size is not None and dataset_size[split] != 'all':
-            dataset.img_names = dataset.img_names[:dataset_size[split]]
-    
+    if name == 'denmark':
+        dataset = denmark.Denmark(path, images, n_classes, transform)
+    elif name == 'denmark_shapes':
+        dataset = denmark_shapes.Denmark(path, images, n_classes, transform)
+    elif name == 'denmark_cob':
+        dataset = denmark_cob.Denmark(path, images, n_classes, transform)
     else:
         raise ValueError(f'Dataset {name} not defined.')
 
