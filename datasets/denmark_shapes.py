@@ -13,7 +13,7 @@ from helpers import utils
 from helpers import transformers
 
 class Denmark(data.Dataset):
-    def __init__(self, path, images, n_classes, transform):
+    def __init__(self, path, images, n_classes, transform = None):
         
         self.path = path
         self.images = images
@@ -33,7 +33,8 @@ class Denmark(data.Dataset):
         image_path = os.path.join(self.images_path, name + ".jpg")
         image = imread(image_path)
         n_rows, n_cols = len(image), len(image[0]) 
-        image = self.transform(image)
+        if self.transform is not None:
+            image = self.transform(image)
         
         # load points
         points_path = os.path.join(self.points_path, name + "_points.npy")
@@ -53,7 +54,7 @@ class Denmark(data.Dataset):
         shapes = Image.new('L', (n_rows, n_cols), 0)
             
         for shape in shapes_list:
-            flat_list = [item.item() for sublist in shape for item in sublist]
+            flat_list = [item for sublist in shape for item in sublist]
             ImageDraw.Draw(shapes).polygon(flat_list, outline=1, fill=1)
         
         shapes = np.array(shapes)
@@ -62,7 +63,7 @@ class Denmark(data.Dataset):
                 "points": points,
                 "counts": counts, 
                 "shapes": shapes,
-                "meta": {"index": index, "path": images_path}
+                "meta": {"index": index, "path": image_path}
         }
                 
         return item

@@ -36,10 +36,10 @@ def make_bilinear_weights(size, num_channels):
     return w
 
 
-class CobNet(nn.Module):
+class COBNet(nn.Module):
     def __init__(self, n_orientations=8):
 
-        super(CobNet, self).__init__()
+        super(COBNet, self).__init__()
         self.base_model = models.resnet50(pretrained=True)
 
         self.reducers = nn.ModuleList([
