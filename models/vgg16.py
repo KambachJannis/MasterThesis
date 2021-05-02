@@ -8,7 +8,7 @@ import numpy as np
 import torch.utils.model_zoo as model_zoo
 
 
-class FCN8_VGG16(nn.Module):
+class VGG16(nn.Module):
     def __init__(self, n_classes):
         super().__init__()
         self.n_classes = n_classes

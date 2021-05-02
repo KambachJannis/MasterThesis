@@ -8,7 +8,7 @@ from skimage.measure import regionprops as ski_regions
 from skimage.segmentation import watershed as ski_watershed
 from skimage.segmentation import find_boundaries as ski_boundaries
 
-def computeLoss(points, probs, cob, roi_mask=None):
+def computeLoss(probs, points, cob, roi_mask=None):
     """
     points: n x c x h x w
     probs: h x w (0 or 1)
@@ -134,7 +134,7 @@ def getPixelChecklist(points, probs, cob, roi_mask = None, batch = 0):
         else:
             # get ids of all the background pixels in RoI
             ids_background = np.where(blob_mask.ravel())[0]
-            checklist += [{'scale': 1.1, 'id_list': ids_background, 'label': 0, 'batch': batch}]
+            checklist += [{'scale': 1, 'id_list': ids_background, 'label': 0, 'batch': batch}]
             
     ################ CONVOLUTIONAL ORIENTED BOUNDARIES ######################
     

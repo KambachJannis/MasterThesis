@@ -8,9 +8,7 @@ import numpy as np
 # Image Handling
 from skimage.io import imread
 from PIL import Image, ImageDraw
-# Custom
-from helpers import utils
-from helpers import transformers
+
 
 class Denmark(data.Dataset):
     def __init__(self, path, images, n_classes, transform = None):
