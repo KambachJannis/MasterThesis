@@ -6,9 +6,9 @@ def getLoss(loss_name):
         criterion = torch.nn.BCELoss()
     elif loss_name == "CrossEntropy":
         criterion = torch.nn.CrossEntropyLoss()
-    elif loss_name == "cob":
+    elif loss_name == "point_cob":
         criterion = cob_loss.computeLoss
-    elif loss_name == "lcfcn":
+    elif loss_name == "point":
         criterion = lcfcn_loss.computeLoss
     else:
         raise ValueError(f"Loss {loss_name} not implemented.")
