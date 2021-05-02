@@ -1,13 +1,13 @@
-from models import lcfcn, cob, supervised
+from models import resnet, vgg16, unet
 
-def getModel(exp_dict, n_classes = None):
-    name = exp_dict['model']['name']
-    if name in ["lcfcn"]:
-        model =  lcfcn.LCFCN(exp_dict, n_classes)
-    elif name in ["cob"]:
-        model =  cob.COB(exp_dict, n_classes)
-    elif name in ["supervised"]:
-        model =  supervised.Supervised(exp_dict, n_classes)
+def getNet(net_name, n_classes):
+    if net_name == "resnet":
+        model = resnet.FCN8()
+    elif net_name == "vgg16":
+        model = vgg16.VGG16(n_classes)
+    elif net_name == "unet":
+        model = unet.UNet(n_classes)
     else:
-        raise ValueError(f'Model {name} not defined.')
+        raise ValueError(f"Net {base_name} does not exist")
+
     return model
