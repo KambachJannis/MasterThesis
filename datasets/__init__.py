@@ -2,7 +2,7 @@ from datasets import denmark, denmark_cob, denmark_shapes
 
 def getDataset(name, path, images, n_classes, transform):
     
-    if name == 'denmark':
+    if name == 'denmark_points':
         dataset = denmark.Denmark(path, images, n_classes, transform)
     elif name == 'denmark_shapes':
         dataset = denmark_shapes.Denmark(path, images, n_classes, transform)

@@ -24,14 +24,11 @@ class Manager:
         self.loss_list = None
         self.best_loss = None
         
-class Meter:
-    def __init__(self):
-        self.n_sum = 0.
-        self.n_counts = 0.
-
-    def add(self, n_sum, n_counts):
-        self.n_sum += n_sum 
-        self.n_counts += n_counts
-
-    def get_avg_score(self):
-        return self.n_sum / self.n_counts
+    def loadState(self, manager):
+        self.epochs = manager.epochs + 1
+        self.current_epoch = manager.current_epoch
+        self.loss_list = manager.loss_list
+        
+    def begin(self):
+        self.current_epoch = 0
+        self.loss_list = []
