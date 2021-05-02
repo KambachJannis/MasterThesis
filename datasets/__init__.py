@@ -6,7 +6,7 @@ def getDataset(name, path, images, n_classes, transform):
         dataset = denmark.Denmark(path, images, n_classes, transform)
     elif name == 'denmark_shapes':
         dataset = denmark_shapes.Denmark(path, images, n_classes, transform)
-    elif name == 'denmark_cob':
+    elif name == 'denmark_points_cob':
         dataset = denmark_cob.Denmark(path, images, n_classes, transform)
     else:
         raise ValueError(f'Dataset {name} not defined.')

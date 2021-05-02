@@ -25,7 +25,7 @@ class Manager:
         self.best_loss = None
         
     def loadState(self, manager):
-        self.epochs = manager.epochs + 1
+        self.epochs = manager.epochs
         self.current_epoch = manager.current_epoch
         self.loss_list = manager.loss_list
         
