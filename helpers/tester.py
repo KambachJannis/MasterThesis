@@ -9,8 +9,8 @@ def testModel(model, test_loader, metric_list):
     
     if 'mIoU' in metric_list:
         results_dict['mIoU'] = testMIoU(model, test_loader)
-    if 'Dice' in metric_list:
-        results_dict['Dice'] = testDice(model, test_loader)
+    if 'dice' in metric_list:
+        results_dict['dice'] = testDice(model, test_loader)
     if 'pAccuracy' in metric_list:
         results_dict['pAccuracy'] = testAccuracy(model, test_loader)
         
@@ -29,8 +29,8 @@ def testMIoU(model, test_loader, threshold = 0.5):
         # Forward Prop
         logits = model.forward(images)
         probs = logits.sigmoid()
-        # get mIoU score (the cutting is done bc unet returns [b x c x h x w] with c = 2 (background = 0, object = 1))
-        score = calculateMIoU(probs.cpu().numpy()[:,1,...], shapes.cpu().numpy(), 1, threshold)
+        # get mIoU score (the cutting is done bc unet returns [b x c x h x w] with c = 2 (background = 0, object = 1)) 
+        score = calculateMIoU(probs.cpu().detach().numpy()[:,-1,...], shapes.cpu().numpy(), 1, threshold)
         # add to list
         score_list.append(score)
         
@@ -62,7 +62,7 @@ def testDice(model, test_loader, threshold = 0.5):
         logits = model.forward(images)
         probs = logits.sigmoid()
         # get mIoU score (the cutting is done bc unet returns [b x c x h x w] with c = 2 (background = 0, object = 1))
-        score = calculateDice(probs.cpu().numpy()[:,1,...], shapes.cpu().numpy(), 1, threshold)
+        score = calculateDice(probs.cpu().detach().numpy()[:,-1,...], shapes.cpu().numpy(), 1, threshold)
         # add to list
         score_list.append(score)
         
@@ -94,7 +94,7 @@ def testAccuracy(model, test_loader, threshold = 0.5):
         logits = model.forward(images)
         probs = logits.sigmoid()
         # get mIoU score (the cutting is done bc unet returns [b x c x h x w] with c = 2 (background = 0, object = 1))
-        score = calculateAcc(probs.cpu().numpy()[:,1,...], shapes.cpu().numpy(), 1, threshold)
+        score = calculateAcc(probs.cpu().detach().numpy()[:,-1,...], shapes.cpu().numpy(), 1, threshold)
         # add to list
         score_list.append(score)
         
@@ -106,8 +106,8 @@ def calculateAcc(probs, target, class_id, threshold):
     mask_preds = probs > threshold
     mask_target = target == class_id
     
-    correct = mask_preds == mask_target
+    correct = (mask_preds == mask_target).sum()
     total = np.size(mask_preds)
-    score = total / correct
+    score = correct / total
     
     return score
