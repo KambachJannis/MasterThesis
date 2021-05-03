@@ -1,7 +1,13 @@
+import cv2
 import torch
+import torchvision
 import numpy as np
-from tqdm.notebook import tqdm
+import matplotlib as plt
 from skimage.io import imread
+from skimage.segmentation import mark_boundaries
+from skimage.morphology import label as ski_label
+from tqdm.notebook import tqdm
+
 
 @torch.no_grad()
 def testModel(model, test_loader, metric_list):
@@ -121,49 +127,93 @@ def calculatepAcc(probs, target, class_id, threshold):
 def imagesToTB(model, test_loader, TB, amount_batches = 30, threshold = 0.5):
     
     model.eval()
-    counter = amount_batcher
+    counter = amount_batches
     
     for batch in tqdm(test_loader):
         if counter > 0:
             # Load Data to GPU
             images = batch["images"].cuda()
-            points = batch["points"].long().cuda()
-            shapes = batch["shapes"].long().cuda()
+            points = batch["points"].long().numpy()
+            shapes = batch["shapes"].long().numpy()
             paths = batch['meta']['path']
             # Forward Prop
             logits = model.forward(images)
             probs = logits.sigmoid()
             # convert
             probs = probs.cpu().detach().numpy()[:,-1,...]
-            shapes = shapes.cpu().numpy()
-            points = points.cpu().numpy()
-            
+            # iterate over images
             for i in range(len(probs)):
-                prob = probs[i]
-                point = points[i]
-                shape = shapes[i]
-                
-                mIoU = calculateMIoU(prob, shape, 1, threshold)
-                dice = calculateDice(prob, shape, 1, threshold)
-                pAcc = calculatepAcc(prob, shape, 1, threshold)
-                label = f"IoU: {mIoU}, Dice: {dice}, Pixel Accuracy: {pAcc}"
-                
                 image_src = imread(paths[i])
-                labels = drawLabels(image_src, point, shape)
-                preds = drawPreds(image_src, prob, threshold)
-                heatmap = drawHeatmap(image_src, prob)
-            
-                img_grid = torchvision.utils.make_grid(images)
+                # calculate scores for image
+                mIoU = calculateMIoU(probs[i], shapes[i], 1, threshold) * 100
+                dice = calculateDice(probs[i], shapes[i], 1, threshold) * 100
+                pAcc = calculatepAcc(probs[i], shapes[i], 1, threshold) * 100
+                label = f"IoU: {np.round(mIoU, 2)}%, Dice: {np.round(dice, 2)}, Pixel Accuracy: {np.round(pAcc, 2)}%"
+                # draw ground truth image
+                labels = drawShapes(image_src, shapes[i])
+                labels = drawPoints(labels, points[i])
+                # draw predicted blobs
+                blobs = ski_label((probs[i] > threshold).astype('uint8') == 1)
+                preds = drawShapes(image_src, blobs)
+                # draw heatmap
+                heatmap = drawHeatmap(probs[i])
+                # stack and add to tensorboard
+                images = np.array([labels, preds, heatmap])
+                images = np.moveaxis(images, -1, 1) #RGB Dimension (last, -1) to second dimension
+                img_grid = torchvision.utils.make_grid(torch.from_numpy(images))
                 TB.add_image(label, img_grid)
         
             counter -= 1
             
+# NOTE: color is BGR           
+def drawPoints(image, points, color = (0, 0, 255), thickness = 2):
+    
+    y_list, x_list = np.where(points)
+    h, w, _ = image.shape
+    img = image.copy()
+    
+    for i, (y, x) in enumerate(zip(y_list, x_list)):
+        if y < 1:
+            x, y = int(x*W), int(y*H) 
+        else:
+            x, y = int(x), int(y) 
             
-def drawLabels(image, points, shapes):
-    pass
+        result = cv2.circle(img, (x,y), 2, color, thickness) 
 
-def drawPreds(image, preds, threshold):
-    pass
+    return result
+    
 
-def drawHeatmap(image, preds):
-    pass
+def drawShapes(image, shapes):
+    
+    objects = np.unique(shapes)
+    red = np.zeros(image.shape, dtype='uint8')
+    red[:,:,2] = 255
+    alpha = 0.5
+    result = image.copy()
+    
+    for obj in objects:
+        if obj == 0: continue
+        mask = shapes == obj
+        result[mask] = result[mask] * alpha + red[mask] * (1 - alpha)
+        
+    result = mark_boundaries(result, shapes) 
+
+    return result
+
+
+def drawHeatmap(image):
+    
+    img = image.copy()
+    img = img / max(1, img.max()) #scale to max as 1
+    img = np.maximum(img, 0) # zero negative probs
+    img = img / max(1, img.max()) # no changes
+    img = img * 255 # scale to 0-255
+
+    img = img.astype(int)
+    cmap = plt.cm.get_cmap("jet")
+    result = np.zeros(img.shape + (3, ), dtype=np.float64)
+
+    for c in np.unique(img):
+        result[(img == c).nonzero()] = cmap(c)[:3]
+        
+    return result
