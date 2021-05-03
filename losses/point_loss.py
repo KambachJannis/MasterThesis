@@ -15,10 +15,9 @@ def computeLoss(probs, points, roi_mask=None):
     
     """
     loss = 0.
-    # eliminate single dimensions (A x B x 1 -> A x B)
-    points_red = points.squeeze()
+    points_red = points.squeeze() # (1, 256, 256) -> (256, 256)
     assert(points_red.max() <= 1)
-    probs_red = probs.squeeze()
+    probs_red = probs.squeeze() # (1, 1, 256, 256) -> (256, 256)
     # unfold A x B tensor to A*B x 1 tensor
     probs_flat = probs_red.view(-1)
     
@@ -36,6 +35,52 @@ def computeLoss(probs, points, roi_mask=None):
     return loss
 
 
+def computeLossBatches(probs, points, roi_mask=None):
+    
+    probs_ids, targets = getFullTargets(probs, points, roi_mask)
+    targets = targets.cuda()
+    
+    probs_flat = probs.view(-1)
+    try:
+        probs_selected = probs_flat[probs_ids]
+    except:
+        torch.save(probs_flat, 'flat.pt')
+        torch.save(probs_ids, 'ids.pt')
+    
+    criterion = torch.nn.BCELoss()
+    loss = criterion(probs_selected, targets)
+    
+    return loss
+
+
+@torch.no_grad()
+def getFullTargets(probs, points, roi_mask=None):
+    
+    probs_ids = []
+    targets = []
+    offset = 0
+    
+    for i in range(len(probs)):
+        prob = probs[i][-1]
+        point = points[i]
+        # run checklist method for one batch instance
+        checklist = getPixelChecklist(point, prob, roi_mask)
+        # collect ids and targets
+        for item in checklist:
+            ids = item['id_list']
+            if torch.is_tensor(ids):
+                ids_offset = [x.item() + offset for x in ids]
+            else:
+                ids_offset = [x + offset for x in ids]
+            labels = [item['label']] * len(ids)
+            probs_ids.extend(ids_offset)
+            targets.extend(labels)
+        
+        offset += np.size(prob.detach().cpu().numpy())    
+    
+    return probs_ids, torch.Tensor(targets)
+    
+
 @torch.no_grad()
 def getPixelChecklist(points, probs, roi_mask = None, batch = 0):
     """
@@ -43,7 +88,6 @@ def getPixelChecklist(points, probs, roi_mask = None, batch = 0):
     
     """
     checklist = []
-    
     ################ IMAGE LEVEL ######################
     pt_flat = points.view(-1)
     pr_flat = probs.view(-1)
