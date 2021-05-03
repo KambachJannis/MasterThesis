@@ -16,7 +16,7 @@ from helpers.cob.dataset import PASCALDataSet
 cfg = {
     'images': "/home/jovyan/work/ma/helpers/cob/pascal-voc/VOC2012",
     'segments': "/home/jovyan/work/ma/helpers/cob/trainval",
-    'run': "/home/jovyan/work/runs/cob",
+    'run': "/home/jovyan/work/runs/X_COBNET",
     'lr': 1e-4,
     'decay': 2e-4,
     'momentum': 0.9,
@@ -74,7 +74,7 @@ def initRetrain(cfg):
                     'fuse': optim.lr_scheduler.MultiStepLR(optimizers['fuse'], milestones=[cfg['epochs-div-lr']], gamma=0.1)
     }
 
-    if (os.path.exists(os.path.join(cfg['run'], 'checkpoints', 'cp_fs.pth.tar'))):
+    if (os.path.exists(os.path.join(cfg['run'], 'cp_fs.pth.tar'))):
         print('found model, will skip fusion mode')
         start_epoch = 8
         mode = 'or'
@@ -98,7 +98,7 @@ def initRetrain(cfg):
             lr_scheduler[k].step()
 
         # save checkpoint
-        save_path = os.path.join(cfg['run'], 'checkpoints', 'cp_{}.pth.tar'.format(mode))
+        save_path = os.path.join(cfg['run'], 'cp_{}.pth.tar'.format(mode))
         state_dict = model.state_dict()
         torch.save(state_dict, save_path)
 

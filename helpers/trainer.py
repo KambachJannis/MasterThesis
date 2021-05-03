@@ -11,6 +11,8 @@ def trainModel(model, optimizer, train_loader, criterion, mode):
         loss = trainPointCOB(model, optimizer, train_loader, criterion)
     elif mode == 'supervised':
         loss = trainSupervised(model, optimizer, train_loader, criterion)
+    else:
+        raise ValueError("wrong train mode given")
         
     return loss
 
@@ -24,6 +26,8 @@ def valModel(model, val_loader, criterion, mode):
         loss = valPointCOB(model, val_loader, criterion)
     elif mode == 'supervised':
         loss = valSupervised(model, val_loader, criterion)
+    else:
+        raise ValueError("wrong val mode given")
         
     return loss
 

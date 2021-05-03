@@ -24,7 +24,6 @@ def computeLoss(probs, points, cob, roi_mask=None):
     probs_flat = probs_red.view(-1)
     
     # get list of all relevant pixels and their GT labels
-    #checklist = handleBatches(points, probs, roi_mask)
     checklist = getPixelChecklist(points_red, probs_red, cob_red, roi_mask)
     
     for item in checklist:
@@ -39,21 +38,6 @@ def computeLoss(probs, points, cob, roi_mask=None):
         loss += item['scale'] * F.binary_cross_entropy(item_ids, item_label, reduction='mean')
     
     return loss
-
-@torch.no_grad()
-def handleBatches(points_batch, probs_batch, roi_mask = None):
-    
-    checklist = []
-    batches = len(probs_batch)
-    
-    for batch in range(batches):
-        
-        points = points_batch[batch].squeeze()
-        probs = probs_batch[batch].squeeze()
-        
-        checklist += getPixelChecklist(points, probs, roi_mask, batch)
-            
-    return checklist
 
 
 @torch.no_grad()

@@ -24,6 +24,8 @@ class Manager:
         self.loss_list = None
         self.best_loss = None
         
+        self.test_dicts = None
+        
     def loadState(self, manager):
         self.epochs = manager.epochs
         self.current_epoch = manager.current_epoch
@@ -32,3 +34,10 @@ class Manager:
     def begin(self):
         self.current_epoch = 0
         self.loss_list = []
+        
+    def addTest(self, test_dict):
+        if self.test_dicts is None:
+            self.test_dicts = [test_dict]
+        else:
+            self.test_dicts.append(test_dict)
+        
