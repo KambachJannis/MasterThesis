@@ -133,7 +133,7 @@ def imagesToTB(model, test_loader, TB, amount_batches = 30, threshold = 0.5):
         if counter > 0:
             # Load Data to GPU
             images = batch["images"].cuda()
-            points = batch["points"].long().numpy()
+            #points = batch["points"].long().numpy()
             shapes = batch["shapes"].long().numpy()
             paths = batch['meta']['path']
             # Forward Prop
@@ -151,7 +151,7 @@ def imagesToTB(model, test_loader, TB, amount_batches = 30, threshold = 0.5):
                 label = f"IoU: {np.round(mIoU, 2)}%, Dice: {np.round(dice, 2)}, Pixel Accuracy: {np.round(pAcc, 2)}%"
                 # draw ground truth image
                 labels = drawShapes(image_src, shapes[i])
-                labels = drawPoints(labels, points[i])
+                #labels = drawPoints(labels, points[i])
                 # draw predicted blobs
                 blobs = ski_label((probs[i] > threshold).astype('uint8') == 1)
                 preds = drawShapes(image_src, blobs)

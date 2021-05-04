@@ -11,14 +11,15 @@ from PIL import Image, ImageDraw
 
 
 class Denmark(data.Dataset):
-    def __init__(self, path, images, n_classes, transform = None):
+    def __init__(self, path, images, object_type, n_classes, transform = None):
         
         self.path = path
         self.images = images
         self.transform = transform
+        self.object_type = object_type
         self.n_classes = n_classes
         self.images_path = os.path.join(path, 'images')
-        self.points_path = os.path.join(path, 'points')
+        self.points_path = os.path.join(path, 'points_'+object_type)
         self.cob_path = os.path.join(path, 'cob')
     
     def __len__(self):
