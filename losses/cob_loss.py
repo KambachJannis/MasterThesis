@@ -123,6 +123,9 @@ def getPixelChecklist(points, probs, cob, roi_mask = None, batch = 0):
     ################ CONVOLUTIONAL ORIENTED BOUNDARIES ######################
     
     for blob in foreground_blobs:
+        if not os.path.isfile("blobs.pt"):
+            torch.save(blobs, "blobs.pt")
+            torch.save(cob, "cob.pt")
         # not background
         if blob == 0:
             continue
@@ -132,6 +135,10 @@ def getPixelChecklist(points, probs, cob, roi_mask = None, batch = 0):
         ids_blob = np.where(blob_mask.ravel())[0]
         # apply mask to cob
         cob_preds = torch.round(cob[blob_mask])
+        # check if objectness is white or black
+        cob_preds_inv = (1 - cob_preds)
+        if cob_preds_inv.sum() > cob_preds.sum():
+            cob_preds = cob_preds_inv    
         
         checklist += [{'scale': 1, 'id_list': ids_blob, 'label': None, 'labels': cob_preds, 'batch': batch}]  #boundaries = background = 0
 
