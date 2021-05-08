@@ -1,11 +1,7 @@
-# System
 import os
-# Torch
 import torch
 from torch.utils import data
-# Data Handling
 import numpy as np
-# Image Handling
 from skimage.io import imread
 from PIL import Image, ImageDraw
 
@@ -36,8 +32,12 @@ class Denmark(data.Dataset):
         
         # load points
         points_path = os.path.join(self.points_path, name + "_points.npy")
-        points_list = np.load(points_path)
         points = np.zeros((n_rows, n_cols, 1), dtype = int)
+        
+        if os.path.isfile(points_path):
+            points_list = np.load(points_path)
+        else:
+            points_list = []
         
         for point in points_list:
             x, y = point[0]-1, point[1]-1
