@@ -1,4 +1,4 @@
-from datasets import denmark_points, denmark_cob, denmark_shapes, trancos
+from datasets import denmark_points, denmark_shapes, denmark_cob, denmark_hybrid, trancos
 
 def getDataset(name, path, images, object_type, n_classes, transform):
     
@@ -6,6 +6,8 @@ def getDataset(name, path, images, object_type, n_classes, transform):
         dataset = denmark_points.Denmark(path, images, object_type, n_classes, transform)
     elif name == 'denmark_shapes':
         dataset = denmark_shapes.Denmark(path, images, object_type, n_classes, transform)
+    elif name == 'denmark_hybrid':
+        dataset = denmark_hybrid.Denmark(path, images, object_type, n_classes, transform)
     elif name == 'denmark_points_cob':
         dataset = denmark_cob.Denmark(path, images, object_type, n_classes, transform)
     elif name == 'trancos':
