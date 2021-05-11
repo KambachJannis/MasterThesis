@@ -46,8 +46,6 @@ class Denmark(data.Dataset):
         shapes = np.array(shapes)
         
         item = {"images": image, 
-                #"points": points,
-                #"counts": counts, 
                 "shapes": shapes,
                 "meta": {"index": index, "path": image_path}
         }

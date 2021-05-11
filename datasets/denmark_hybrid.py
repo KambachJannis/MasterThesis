@@ -73,9 +73,9 @@ class Denmark(data.Dataset):
         item = {"images": image, 
                 "points": points,
                 "counts": counts,
-                "label_p": label_point
+                "label_p": label_point,
                 "shapes": shapes,
-                "label_s": label_shape
+                "label_s": label_shape,
                 "meta": {"index": index, "path": image_path}
         }
                 
