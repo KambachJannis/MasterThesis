@@ -36,8 +36,10 @@ class Denmark(data.Dataset):
         
         if os.path.isfile(points_path):
             points_list = np.load(points_path)
+            label = 1
         else:
             points_list = []
+            label = 0
         
         for point in points_list:
             x, y = point[0]-1, point[1]-1
@@ -48,7 +50,8 @@ class Denmark(data.Dataset):
         
         item = {"images": image, 
                 "points": points,
-                "counts": counts, 
+                "counts": counts,
+                "label": label,
                 "meta": {"index": index, "path": image_path}
         }
                 
