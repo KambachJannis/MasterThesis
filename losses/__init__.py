@@ -10,7 +10,7 @@ def getLoss(loss_name):
         criterion = cob_loss.computeLoss
     elif loss_name == "point":
         criterion = point_loss.computeLoss
-    elif loss_name = "hybrid":
+    elif loss_name == "hybrid":
         criterion = point_loss.computeLoss # or COB Loss
     else:
         raise ValueError(f"Loss {loss_name} not implemented.")
