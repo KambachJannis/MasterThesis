@@ -33,7 +33,7 @@ def valModel(model, val_loader, criterion, mode):
     else:
         raise ValueError("wrong val mode given")
         
-    return loss
+    return loss_dict
 
 
 def trainPoint(model, optimizer, train_loader, criterion):
