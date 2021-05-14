@@ -22,9 +22,10 @@ class Denmark(data.Dataset):
         self.object_type = object_type
         self.n_classes = n_classes
         self.images_path = os.path.join(path, 'images')
+        self.model_output = []
         
         checkpoint = torch.load("/home/jovyan/work/runs/buildings_points_final/checkpoint_best.pth")
-        self.model = models.getNet('vgg16', 2).cuda().load_state_dict(checkpoint['model']).eval()
+        self.model = models.getNet('vgg16', 2).cuda().load_state_dict(checkpoint['model']).eval()        
         
     
     def __len__(self):
@@ -41,11 +42,15 @@ class Denmark(data.Dataset):
             image = self.transform(image)
             
         # process image via model to get noisy targets
-        with torch.no_grad():
-            out = self.model.forward(image.cuda())
+        if index not in self.model_output:
+            with torch.no_grad():
+                out = self.model.forward(image.cuda())
         
-        probs = out.sigmoid().cpu().detach().numpy()
-        shapes = ski_label((probs > 0.5).astype('uint8') == 1)
+            probs = out.sigmoid().cpu().detach().numpy()
+            shapes = ski_label((probs > 0.5).astype('uint8') == 1)
+            self.model_output[index] = shapes
+        else:
+            shapes = self.model_output[index]
         
         item = {"images": image, 
                 "shapes": shapes,

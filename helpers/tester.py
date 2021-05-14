@@ -52,7 +52,10 @@ def calculateMIoU(probs, target, class_id, threshold):
     
     intersection = np.logical_and(mask_preds, mask_target).sum()
     union = np.logical_or(mask_preds, mask_target).sum()
-    score = intersection / union
+    if intersection == 0 or union == 0:
+        score = 0
+    else:
+        score = intersection / union
     
     return score
 
@@ -85,7 +88,10 @@ def calculateDice(probs, target, class_id, threshold):
     
     intersection = np.logical_and(mask_preds, mask_target).sum()
     total = mask_preds.sum() + mask_target.sum()
-    score = (2 * intersection) / total
+    if intersection == 0 or total == 0:
+        score = 0
+    else:
+        score = (2 * intersection) / total
     
     return score
 
@@ -118,7 +124,10 @@ def calculatepAcc(probs, target, class_id, threshold):
     
     correct = (mask_preds == mask_target).sum()
     total = np.size(mask_preds)
-    score = correct / total
+    if correct == 0 or total == 0:
+        score = 0
+    else:
+        score = correct / total 
     
     return score
 

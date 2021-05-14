@@ -9,8 +9,8 @@ def trainModel(model, optimizer, train_loader, criterion, mode):
         loss = trainPoint(model, optimizer, train_loader, criterion)
     elif mode == 'point_cob':
         loss = trainPointCOB(model, optimizer, train_loader, criterion)
-    elif mode == 'hybrid':
-        loss = trainHybrid(model, optimizer, train_loader, criterion)
+    elif mode == 'mixed':
+        loss = trainMixed(model, optimizer, train_loader, criterion)
     elif mode == 'supervised':
         loss = trainSupervised(model, optimizer, train_loader, criterion)
     else:
@@ -23,10 +23,10 @@ def trainModel(model, optimizer, train_loader, criterion, mode):
 def valModel(model, val_loader, criterion, mode):
     
     if mode == 'point':
-        loss = valPoint(model, val_loader, criterion)
+        loss_dict = valPoint(model, val_loader, criterion)
     elif mode == 'point_cob':
         loss = valPointCOB(model, val_loader, criterion)
-    elif mode == 'hybrid':
+    elif mode == 'mixed':
         loss = valPoint(model, val_loader, criterion) # or valPointCOB, idea is to no used full labels in val set
     elif mode == 'supervised':
         loss = valSupervised(model, val_loader, criterion)
@@ -64,20 +64,27 @@ def trainPoint(model, optimizer, train_loader, criterion):
 def valPoint(model, val_loader, criterion):
              
     model.eval()
-    loss_list = [] 
+    loss_list = []
+    mIoU_list = []
     
     for batch in tqdm(val_loader):
         # Load Data to GPU
         images = batch["images"].cuda()
         target = batch["points"].long().cuda()
+        shapes = batch["shapes"].long().cuda()
         # Forward Prop
         logits = model.forward(images)
         probs = logits.sigmoid()
         # Calculate Loss
         loss = criterion(probs, target)
         loss_list.append(loss.item())
+        # get mIoU score (the cutting is done bc unet returns [b x c x h x w] with c = 2 (background = 0, object = 1)) 
+        probs = probs.cpu().detach().numpy()
+        mIoU = calculateMIoU(probs[:,-1,...], shapes.cpu().numpy(), 1, 0.5)
+        mIoU_list.append(mIoU)
         
-    return np.mean(loss_list)
+    return {'loss': np.mean(loss_list),
+            'mIoU': np.mean(mIoU_list)}
 
     
 def trainPointCOB(model, optimizer, train_loader, criterion):
@@ -109,7 +116,8 @@ def trainPointCOB(model, optimizer, train_loader, criterion):
 def valPointCOB(model, val_loader, criterion):
              
     model.eval()
-    loss_list = [] 
+    loss_list = []
+    mIoU_list = []
     
     for batch in tqdm(val_loader):
         # Load Data to GPU
@@ -122,8 +130,13 @@ def valPointCOB(model, val_loader, criterion):
         # Calculate Loss
         loss = criterion(probs, target, cob)
         loss_list.append(loss.item())
+        # get mIoU score (the cutting is done bc unet returns [b x c x h x w] with c = 2 (background = 0, object = 1)) 
+        probs = probs.cpu().detach().numpy()
+        mIoU = calculateMIoU(probs[:,-1,...], shapes.cpu().numpy(), 1, 0.5)
+        mIoU_list.append(mIoU)
         
-    return np.mean(loss_list)
+    return {'loss': np.mean(loss_list),
+            'mIoU': np.mean(mIoU_list)}
 
    
 def trainSupervised(model, optimizer, train_loader, criterion):
@@ -154,7 +167,8 @@ def trainSupervised(model, optimizer, train_loader, criterion):
 def valSupervised(model, val_loader, criterion):
              
     model.eval()
-    loss_list = [] 
+    loss_list = []
+    mIoU_list = []
     
     for batch in tqdm(val_loader):
         # Load Data to GPU
@@ -166,11 +180,16 @@ def valSupervised(model, val_loader, criterion):
         # Calculate Loss
         loss = criterion(probs, target)
         loss_list.append(loss.item())
+        # get mIoU score (the cutting is done bc unet returns [b x c x h x w] with c = 2 (background = 0, object = 1)) 
+        probs = probs.cpu().detach().numpy()
+        mIoU = calculateMIoU(probs[:,-1,...], shapes.cpu().numpy(), 1, 0.5)
+        mIoU_list.append(mIoU)
         
-    return np.mean(loss_list)
+    return {'loss': np.mean(loss_list),
+            'mIoU': np.mean(mIoU_list)}
 
 
-def trainHybrid(model, optimizer, train_loader, criterion):
+def trainMixed(model, optimizer, train_loader, criterion):
     
     model.train()
     loss_list = [] 
@@ -203,3 +222,18 @@ def trainHybrid(model, optimizer, train_loader, criterion):
         optimizer.step()
         
     return np.mean(loss_list)
+
+def calculateMIoU(probs, target, class_id, threshold = 0.5):
+    
+    mask_preds = probs > threshold
+    mask_target = target == class_id
+    
+    intersection = np.logical_and(mask_preds, mask_target).sum()
+    union = np.logical_or(mask_preds, mask_target).sum()
+    if intersection == 0 or union == 0:
+        score = 0
+    else:
+        score = intersection / union
+    
+    return score
+        
