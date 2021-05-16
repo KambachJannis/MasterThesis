@@ -70,6 +70,10 @@ def valPoint(model, val_loader, criterion):
     for batch in tqdm(val_loader):
         # Load Data to GPU
         images = batch["images"].cuda()
+        # check labels
+        if batch["label_p"] == 0 or batch["label_s"] == 0:
+            raise ValueError("A sample in the validation set is missing either point- or shape-labels.") 
+        # more loading
         target = batch["points"].long().cuda()
         shapes = batch["shapes"].long().cuda()
         # Forward Prop
@@ -122,7 +126,12 @@ def valPointCOB(model, val_loader, criterion):
     for batch in tqdm(val_loader):
         # Load Data to GPU
         images = batch["images"].cuda()
+        # check labels
+        if batch["label_p"] == 0 or batch["label_s"] == 0 or batch["label_c"] == 0:
+            raise ValueError("A sample in the validation set is missing either point-, cob-, or shape-labels.") 
+        # more loading
         target = batch["points"].long().cuda()
+        shapes = batch["shapes"].long().cuda()
         cob = batch["cob"].cuda()
         # Forward Prop
         logits = model.forward(images)
@@ -173,6 +182,9 @@ def valSupervised(model, val_loader, criterion):
     for batch in tqdm(val_loader):
         # Load Data to GPU
         images = batch["images"].cuda()
+        if batch["label_s"] == 0:
+            raise ValueError("A sample in the validation set is missing shape-labels.") 
+        # more loading
         target = batch["shapes"].long().cuda()
         # Forward Prop
         logits = model.forward(images)

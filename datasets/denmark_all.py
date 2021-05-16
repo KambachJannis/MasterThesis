@@ -70,12 +70,24 @@ class Denmark(data.Dataset):
         
         shapes = np.array(shapes)
         
+        # load cob
+        cob_path = os.path.join(self.cob_path, name + ".jpg")
+        if os.path.isfile(cob_path):
+            cob = imread(cob_path)[:, :, 1].astype('float64')
+            cob /= 255.0
+            label_cob = 1
+        else:
+            cob = np.zeros((n_rows, n_cols, 1), dtype = int)
+            label_cob = 0
+        
         item = {"images": image, 
                 "points": points,
                 "counts": counts,
                 "label_p": label_point,
                 "shapes": shapes,
                 "label_s": label_shape,
+                "cob": cob,
+                "label_c": label_cob,
                 "meta": {"index": index, "path": image_path}
         }
                 
