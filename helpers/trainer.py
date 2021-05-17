@@ -25,11 +25,11 @@ def valModel(model, val_loader, criterion, mode):
     if mode == 'point':
         loss_dict = valPoint(model, val_loader, criterion)
     elif mode == 'point_cob':
-        loss = valPointCOB(model, val_loader, criterion)
+        loss_dict = valPointCOB(model, val_loader, criterion)
     elif mode == 'mixed':
-        loss = valPoint(model, val_loader, criterion) # or valPointCOB, idea is to no used full labels in val set
+        loss_dict = valPoint(model, val_loader, criterion) # or valPointCOB, idea is to no used full labels in val set
     elif mode == 'supervised':
-        loss = valSupervised(model, val_loader, criterion)
+        loss_dict = valSupervised(model, val_loader, criterion)
     else:
         raise ValueError("wrong val mode given")
         

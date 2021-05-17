@@ -21,6 +21,7 @@ class Denmark(data.Dataset):
         self.images_path = os.path.join(path, 'images')
         self.points_path = os.path.join(path, 'points_'+object_type)
         self.shapes_path = os.path.join(path, 'shapes_'+object_type)
+        self.cob_path = os.path.join(path, 'cob')
     
     def __len__(self):
         return len(self.images)
