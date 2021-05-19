@@ -6,7 +6,7 @@ def getNet(net_name, n_classes):
     elif net_name == "vgg16":
         model = vgg16.VGG16(n_classes-1)
     elif net_name == "unet":
-        model = resunet.ResNetUNet(n_classes)
+        model = resunet.Unet(n_classes = n_classes)
     else:
         raise ValueError(f"Net {base_name} does not exist")
 

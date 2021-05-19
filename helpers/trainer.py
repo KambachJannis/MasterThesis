@@ -82,7 +82,7 @@ def valPoint(model, val_loader, criterion):
         # Calculate Loss
         loss = criterion(probs, target)
         loss_list.append(loss.item())
-        # get mIoU score (the cutting is done bc unet returns [b x c x h x w] with c = 2 (background = 0, object = 1)) 
+        # get mIoU score
         probs = probs.cpu().detach().numpy()
         mIoU = calculateMIoU(probs[:,-1,...], shapes.cpu().numpy(), 1, 0.5)
         mIoU_list.append(mIoU)
@@ -139,7 +139,7 @@ def valPointCOB(model, val_loader, criterion):
         # Calculate Loss
         loss = criterion(probs, target, cob)
         loss_list.append(loss.item())
-        # get mIoU score (the cutting is done bc unet returns [b x c x h x w] with c = 2 (background = 0, object = 1)) 
+        # get mIoU score
         probs = probs.cpu().detach().numpy()
         mIoU = calculateMIoU(probs[:,-1,...], shapes.cpu().numpy(), 1, 0.5)
         mIoU_list.append(mIoU)
@@ -161,7 +161,7 @@ def trainSupervised(model, optimizer, train_loader, criterion):
         target = batch["shapes"].long().cuda()
         # Forward Prop
         logits = model.forward(images)
-        probs = logits.sigmoid()
+        probs = logits.sigmoid()[:,-1,...]
         # Calculate Loss
         loss = criterion(probs, target)
         loss_list.append(loss.item())
@@ -182,29 +182,30 @@ def valSupervised(model, val_loader, criterion):
     for batch in tqdm(val_loader):
         # Load Data to GPU
         images = batch["images"].cuda()
-        if batch["label_s"] == 0:
+        if 0 in batch["label_s"]:
             raise ValueError("A sample in the validation set is missing shape-labels.") 
         # more loading
         target = batch["shapes"].long().cuda()
         # Forward Prop
         logits = model.forward(images)
-        probs = logits.sigmoid()
+        probs = logits.sigmoid()[:,-1,...]
         # Calculate Loss
         loss = criterion(probs, target)
         loss_list.append(loss.item())
-        # get mIoU score (the cutting is done bc unet returns [b x c x h x w] with c = 2 (background = 0, object = 1)) 
+        # get mIoU score
         probs = probs.cpu().detach().numpy()
-        mIoU = calculateMIoU(probs[:,-1,...], shapes.cpu().numpy(), 1, 0.5)
+        mIoU = calculateMIoU(probs, target.cpu().numpy(), 1, 0.5)
         mIoU_list.append(mIoU)
         
     return {'loss': np.mean(loss_list),
             'mIoU': np.mean(mIoU_list)}
 
-
+import losses
 def trainMixed(model, optimizer, train_loader, criterion):
     
     model.train()
-    loss_list = [] 
+    loss_list = []
+    criterion2 = losses.getLoss('dice')
     
     for batch in tqdm(train_loader):
         # Zero Gradients
@@ -218,7 +219,6 @@ def trainMixed(model, optimizer, train_loader, criterion):
         # Load Target --------------------------------might need to load COB here too
         if batch['label_s'] == 1:
             target = batch["shapes"].long().cuda()
-            criterion2 = torch.nn.CrossEntropyLoss()
             loss = criterion2(probs, target)
         elif batch['labels_p'] == 1:
             target = batch["points"].long().cuda()

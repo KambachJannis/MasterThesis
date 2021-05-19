@@ -102,7 +102,7 @@ class UpsampleBlock(nn.Module):
     def forward(self, x, skip_connection=None):
 
         x = self.up(x) if self.parametric else F.interpolate(x, size=None, scale_factor=2, mode='bilinear',
-                                                             align_corners=None)
+                                                             align_corners=True)
         if self.parametric:
             x = self.bn1(x) if self.bn1 is not None else x
             x = self.relu(x)
@@ -130,7 +130,7 @@ class Unet(nn.Module):
                  pretrained=True,
                  encoder_freeze=False,
                  n_classes=2,
-                 decoder_filters=(256, 128, 64, 32, 16),
+                 decoder_filters=(1024, 512, 256, 128, 64),
                  parametric_upsampling=False,
                  shortcut_features='default',
                  decoder_use_batchnorm=False):
@@ -149,7 +149,7 @@ class Unet(nn.Module):
         decoder_filters_in = [bb_out_chs] + list(decoder_filters[:-1])
         num_blocks = len(self.shortcut_features)
         for i, [filters_in, filters_out] in enumerate(zip(decoder_filters_in, decoder_filters)):
-            print('upsample_blocks[{}] in: {}   out: {}'.format(i, filters_in, filters_out))
+            #print('upsample_blocks[{}] in: {}   out: {}'.format(i, filters_in, filters_out))
             self.upsample_blocks.append(UpsampleBlock(filters_in, filters_out,
                                                       skip_in=shortcut_chs[num_blocks-i-1],
                                                       parametric=parametric_upsampling,
