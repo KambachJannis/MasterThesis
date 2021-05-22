@@ -27,7 +27,8 @@ def valModel(model, val_loader, criterion, mode):
     elif mode == 'point_cob':
         loss_dict = valPointCOB(model, val_loader, criterion)
     elif mode == 'mixed':
-        loss_dict = valPoint(model, val_loader, criterion) # or valPointCOB, idea is to no used full labels in val set
+        loss_dict = valPointCOB(model, val_loader, criterion)
+        #loss_dict = valPoint(model, val_loader, criterion)
     elif mode == 'supervised':
         loss_dict = valSupervised(model, val_loader, criterion)
     else:
@@ -201,7 +202,7 @@ def valSupervised(model, val_loader, criterion):
             'mIoU': np.mean(mIoU_list)}
 
 import losses
-def trainMixed(model, optimizer, train_loader, criterion):
+def trainMixed(model, optimizer, train_loader, criterion, cob = True):
     
     model.train()
     loss_list = []
@@ -216,13 +217,17 @@ def trainMixed(model, optimizer, train_loader, criterion):
         logits = model.forward(images)
         probs = logits.sigmoid()
         
-        # Load Target --------------------------------might need to load COB here too
+        # Load Target
         if batch['label_s'] == 1:
             target = batch["shapes"].long().cuda()
             loss = criterion2(probs, target)
         elif batch['labels_p'] == 1:
             target = batch["points"].long().cuda()
-            loss = criterion(probs, target)
+            if cob:
+                cob = batch["cob"].cuda()
+                loss = criterion(probs, target, cob)
+            else:
+                loss = criterion(probs, target)
         else:
             raise ValueError("dataset wrong, no label found")
         

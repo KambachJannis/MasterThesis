@@ -35,10 +35,10 @@ def testMIoU(model, test_loader, threshold = 0.5):
         shapes = batch["shapes"].long().cuda()
         # Forward Prop
         logits = model.forward(images)
-        probs = logits.sigmoid()
+        probs = logits.sigmoid()[:,-1,...]
         probs = probs.cpu().detach().numpy()
         # get mIoU score (the cutting is done bc unet returns [b x c x h x w] with c = 2 (background = 0, object = 1)) 
-        score = calculateMIoU(probs[:,-1,...], shapes.cpu().numpy(), 1, threshold)
+        score = calculateMIoU(probs, shapes.cpu().numpy(), 1, threshold)
         # add to list
         score_list.append(score)
         
@@ -133,7 +133,7 @@ def calculatepAcc(probs, target, class_id, threshold):
 
 
 @torch.no_grad()
-def imagesToTB(model, test_loader, TB, amount_batches = 30, threshold = 0.5):
+def imagesToTB(model, test_loader, TB, EXP_ID, amount_batches = 30, threshold = 0.5):
     
     model.eval()
     counter = amount_batches
@@ -147,9 +147,9 @@ def imagesToTB(model, test_loader, TB, amount_batches = 30, threshold = 0.5):
             paths = batch['meta']['path']
             # Forward Prop
             logits = model.forward(images)
-            probs = logits.sigmoid()
+            probs = logits.sigmoid()[:,-1,...]
             # convert
-            probs = probs.cpu().detach().numpy()[:,-1,...]
+            probs = probs.cpu().detach().numpy()
             # iterate over images
             for i in range(len(probs)):
                 image_src = imread(paths[i])
@@ -157,7 +157,7 @@ def imagesToTB(model, test_loader, TB, amount_batches = 30, threshold = 0.5):
                 mIoU = calculateMIoU(probs[i], shapes[i], 1, threshold) * 100
                 dice = calculateDice(probs[i], shapes[i], 1, threshold) * 100
                 pAcc = calculatepAcc(probs[i], shapes[i], 1, threshold) * 100
-                label = f"IoU: {np.round(mIoU, 2)}%, Dice: {np.round(dice, 2)}, Pixel Accuracy: {np.round(pAcc, 2)}%"
+                label = f"{EXP_ID} IoU: {np.round(mIoU, 2)}%, Dice: {np.round(dice, 2)}, Pixel Accuracy: {np.round(pAcc, 2)}%"
                 # draw ground truth image
                 labels = drawShapes(image_src, shapes[i])
                 #labels = drawPoints(labels, points[i])
