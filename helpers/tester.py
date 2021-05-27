@@ -226,3 +226,26 @@ def drawHeatmap(image):
         result[(img == c).nonzero()] = cmap(c)[:3]
         
     return result
+
+
+import os
+@torch.no_grad()
+def generateOutput(model, test_loader, s_path):
+    
+    model.eval()
+    
+    for batch in tqdm(test_loader):
+        # Load Data to GPU
+        images = batch["images"].cuda()
+        paths = batch['meta']['path']
+        # Forward Prop
+        logits = model.forward(images)
+        probs = logits.sigmoid()[:,-1,...]
+        # convert
+        probs = probs.cpu().detach().numpy()
+        # iterate over images
+        for i in range(len(probs)):
+            name = paths[i][:-4] 
+            name = name.split("/")[-1]
+            path = os.path.join(s_path, name+".npy")
+            np.save(path, probs[i])      
