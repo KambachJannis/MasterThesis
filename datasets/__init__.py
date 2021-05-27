@@ -1,4 +1,4 @@
-from datasets import denmark_points, denmark_shapes, denmark_cob, denmark_all, trancos
+from datasets import denmark_points, denmark_shapes, denmark_cob, denmark_all, trancos, voc
 
 def getDataset(name, path, images, object_type, n_classes, transform):
     
@@ -12,6 +12,8 @@ def getDataset(name, path, images, object_type, n_classes, transform):
         dataset = denmark_cob.Denmark(path, images, object_type, n_classes, transform)
     elif name == 'trancos':
         dataset = trancos.Trancos(path, images, object_type, n_classes, transform)
+    elif name == 'voc':
+        dataset = voc.PascalVOC(path, images)
     else:
         raise ValueError(f'Dataset {name} not defined.')
 

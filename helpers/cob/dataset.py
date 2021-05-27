@@ -230,12 +230,12 @@ class Normalize(Augmenter):
         return [self.mean, self.std]
     
     
-def COBtransform(means, stds, width):
+def COBtransform(means, stds):
     normalization_mean = means
     normalization_std = stds
     
     aug = iaa.Sequential([
-        iaa.size.Resize(width),
+        iaa.size.Resize("keep"),
         rescale_augmenter,
         Normalize(mean = normalization_mean, std = normalization_std)
     ])
