@@ -58,7 +58,7 @@ class Denmark(data.Dataset):
         shapes_path = os.path.join(self.shapes_path, name + "_shapes.npy")
         shapes = Image.new('L', (n_rows, n_cols), 0)
         
-        if os.path.isfile(points_path):
+        if os.path.isfile(shapes_path):
             shapes_list = list(np.load(shapes_path, allow_pickle = True))
             label_shape = 1
         else:
