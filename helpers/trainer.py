@@ -202,7 +202,7 @@ def valSupervised(model, val_loader, criterion):
             'mIoU': np.mean(mIoU_list)}
 
 import losses
-def trainMixed(model, optimizer, train_loader, criterion, cob = True):
+def trainMixed(model, optimizer, train_loader, criterion, cob_loss = True):
     
     model.train()
     loss_list = []
@@ -221,9 +221,9 @@ def trainMixed(model, optimizer, train_loader, criterion, cob = True):
         if batch['label_s'] == 1:
             target = batch["shapes"].long().cuda()
             loss = criterion2(probs, target)
-        elif batch['labels_p'] == 1:
+        elif batch['label_p'] == 1:
             target = batch["points"].long().cuda()
-            if cob:
+            if cob_loss:
                 cob = batch["cob"].cuda()
                 loss = criterion(probs, target, cob)
             else:
