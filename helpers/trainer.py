@@ -3,15 +3,17 @@ import numpy as np
 from tqdm.notebook import tqdm
 
 
-def trainModel(model, optimizer, train_loader, criterion, mode):
+def trainModel(model, optimizer, train_loader, criterion, mode, cob_loss = True, n_supervised = 100):
     
     if mode == 'point':
         loss = trainPoint(model, optimizer, train_loader, criterion)
     elif mode == 'point_cob':
         loss = trainPointCOB(model, optimizer, train_loader, criterion)
     elif mode == 'mixed':
-        loss = trainMixed(model, optimizer, train_loader, criterion)
+        loss = trainMixed(model, optimizer, train_loader, criterion, cob_loss, n_supervised)
     elif mode == 'supervised':
+        loss = trainSupervised(model, optimizer, train_loader, criterion)
+    elif mode == 'stacked':
         loss = trainSupervised(model, optimizer, train_loader, criterion)
     else:
         raise ValueError("wrong train mode given")
@@ -28,8 +30,9 @@ def valModel(model, val_loader, criterion, mode):
         loss_dict = valPointCOB(model, val_loader, criterion)
     elif mode == 'mixed':
         loss_dict = valPointCOB(model, val_loader, criterion)
-        #loss_dict = valPoint(model, val_loader, criterion)
     elif mode == 'supervised':
+        loss_dict = valSupervised(model, val_loader, criterion)
+    elif mode == 'stacked':
         loss_dict = valSupervised(model, val_loader, criterion)
     else:
         raise ValueError("wrong val mode given")
@@ -202,11 +205,12 @@ def valSupervised(model, val_loader, criterion):
             'mIoU': np.mean(mIoU_list)}
 
 import losses
-def trainMixed(model, optimizer, train_loader, criterion, cob_loss = True):
+def trainMixed(model, optimizer, train_loader, criterion, cob_loss, n_supervised):
     
     model.train()
     loss_list = []
     criterion2 = losses.getLoss('dice')
+    counter = 0
     
     for batch in tqdm(train_loader):
         # Zero Gradients
@@ -218,9 +222,10 @@ def trainMixed(model, optimizer, train_loader, criterion, cob_loss = True):
         probs = logits.sigmoid()
         
         # Load Target
-        if batch['label_s'] == 1:
+        if batch['label_s'] == 1 and counter < n_supervised:
             target = batch["shapes"].long().cuda()
             loss = criterion2(probs, target)
+            counter += 1
         elif batch['label_p'] == 1:
             target = batch["points"].long().cuda()
             if cob_loss:

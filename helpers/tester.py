@@ -133,7 +133,7 @@ def calculatepAcc(probs, target, class_id, threshold):
 
 
 @torch.no_grad()
-def imagesToTB(model, test_loader, TB, EXP_ID, amount_batches = 30, threshold = 0.5):
+def imagesToTB(model, test_loader, TB, EXP_ID, include_cob = False, amount_batches = 30, threshold = 0.5):
     
     model.eval()
     counter = amount_batches
@@ -142,7 +142,6 @@ def imagesToTB(model, test_loader, TB, EXP_ID, amount_batches = 30, threshold = 
         if counter > 0:
             # Load Data to GPU
             images = batch["images"].cuda()
-            #points = batch["points"].long().numpy()
             shapes = batch["shapes"].long().numpy()
             paths = batch['meta']['path']
             # Forward Prop
@@ -153,6 +152,8 @@ def imagesToTB(model, test_loader, TB, EXP_ID, amount_batches = 30, threshold = 
             # iterate over images
             for i in range(len(probs)):
                 image_src = imread(paths[i])
+                if include_cob:
+                    cob_src = imread(paths[i].replace("images", "cob"))
                 # calculate scores for image
                 mIoU = calculateMIoU(probs[i], shapes[i], 1, threshold) * 100
                 dice = calculateDice(probs[i], shapes[i], 1, threshold) * 100
@@ -160,14 +161,16 @@ def imagesToTB(model, test_loader, TB, EXP_ID, amount_batches = 30, threshold = 
                 label = f"{EXP_ID} IoU: {np.round(mIoU, 2)}%, Dice: {np.round(dice, 2)}, Pixel Accuracy: {np.round(pAcc, 2)}%"
                 # draw ground truth image
                 labels = drawShapes(image_src, shapes[i])
-                #labels = drawPoints(labels, points[i])
                 # draw predicted blobs
                 blobs = ski_label((probs[i] > threshold).astype('uint8') == 1)
                 preds = drawShapes(image_src, blobs)
                 # draw heatmap
                 heatmap = drawHeatmap(probs[i])
                 # stack and add to tensorboard
-                images = np.array([labels, preds, heatmap])
+                if include_cob:
+                    images = np.array([labels, preds, heatmap, cob_src])
+                else:
+                    images = np.array([labels, preds, heatmap])
                 images = np.moveaxis(images, -1, 1) #RGB Dimension (last, -1) to second dimension
                 img_grid = torchvision.utils.make_grid(torch.from_numpy(images))
                 TB.add_image(label, img_grid)
