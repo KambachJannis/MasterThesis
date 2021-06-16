@@ -1,3 +1,3 @@
-ma
+# Semantic Segmentation of Satellite Images Using Point Supervision #
 
-todo I guess
+Master Thesis by Jannis Kambach, WWU Münster
