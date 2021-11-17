@@ -16,10 +16,10 @@ Considering the steadily growing volume of available satellite images and the in
 
 ## Implementation
 
-- 0_Objectness:
-- 1_Preprocessing:
-- 2_Training:
-- 3_Testing:
+- 0_Objectness: testing notebook for evaluating different objectness methods on satellite images and PASCAL VOC
+- 1_Preprocessing: breaks the big 1km x 1km images up into smaller tiles and converts coordinate-based labels into pixel-based labels
+- 2_Training: main training loop with configuration options for testing different supervision approaches
+- 3_Testing: for importing saved model and evaluating them on the test set
 
 ## Usage
 
